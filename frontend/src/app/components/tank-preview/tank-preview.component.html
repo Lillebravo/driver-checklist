@@ -1,0 +1,23 @@
+<h3>Inspektionsstatus & Beräknade Tankplatser (1-4)</h3>
+<table class="styled-table">
+  <thead>
+    <tr>
+      <th>Tank</th>
+      <th>Enhet / Fack</th>
+      <th>Tankkod</th>
+      <th>Senaste Test</th>
+      <th>Giltighet (Beräknad)</th>
+      <th>Nästa Test</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr *ngFor="let s of tankSlots">
+      <td>Tank {{ s.slotNo }}</td>
+      <td>{{ s.source }}</td>
+      <td><strong>{{ s.tankCode }}</strong></td>
+      <td>{{ s.inspectionType }} ({{ s.lastInspectionMonthYear }})</td>
+      <td [class.danger-text]="s.isExpired">{{ s.expiryFormatted }} {{ s.isExpired ? 'UTGÅNGEN!' : '' }}</td>
+      <td><span class="badge info">{{ s.nextTest }}</span></td>
+    </tr>
+  </tbody>
+</table>

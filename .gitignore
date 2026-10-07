@@ -1,0 +1,19 @@
+# .NET
+backend/**/bin/
+backend/**/obj/
+backend/**/*.user
+
+# Angular / Node (frontend has its own .gitignore too, this covers the root)
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+# Editor / OS
+.vs/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Checklistemallar (proprietära, ska inte committas)
+backend/DriverChecklist.Api/Templates/*.xlsx

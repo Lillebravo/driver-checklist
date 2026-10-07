@@ -1,0 +1,90 @@
+<div class="container">
+  <header class="top-bar">
+    <h2>Kemira Farligt Gods - Checklista Generator</h2>
+    <div class="operator-box">
+      <label for="akeri">Åkeri:</label>
+      <input id="akeri" type="text" [(ngModel)]="akeri" placeholder="Åkerinamn" />
+    </div>
+    <div class="operator-box">
+      <label for="operatorName">Operatör / Vakt:</label>
+      <input id="operatorName" type="text" [(ngModel)]="operatorName" placeholder="Namn på vakt" />
+    </div>
+  </header>
+
+  <div *ngIf="errorMessage" class="error-banner">{{ errorMessage }}</div>
+
+  <main class="grid-layout">
+    <section class="card">
+      <app-driver-select
+        [drivers]="drivers"
+        [driverName]="selectedDriverName"
+        (driverNameChange)="selectedDriverName = $event"
+        [adrExpiry]="driverAdrExpiry"
+        (adrExpiryChange)="driverAdrExpiry = $event"
+        [isNewDriver]="isNewDriver"
+        (isNewDriverChange)="onIsNewDriverChange($event)"
+      ></app-driver-select>
+    </section>
+
+    <section class="card">
+      <app-vehicle-select
+        [trucks]="trucks"
+        [truckRegNr]="selectedTruckReg"
+        (truckRegNrChange)="selectedTruckReg = $event"
+        [truckTankCode]="truckTankCode"
+        (truckTankCodeChange)="truckTankCode = $event"
+        [isNewTruck]="isNewTruck"
+        (isNewTruckChange)="isNewTruck = $event"
+        [trailer1Reg]="selectedTrailer1Reg"
+        (trailer1RegChange)="selectedTrailer1Reg = $event"
+        [isNewTrailer1]="isNewTrailer1"
+        (isNewTrailer1Change)="isNewTrailer1 = $event"
+        [trailer2Reg]="selectedTrailer2Reg"
+        (trailer2RegChange)="selectedTrailer2Reg = $event"
+        [isNewTrailer2]="isNewTrailer2"
+        (isNewTrailer2Change)="isNewTrailer2 = $event"
+      ></app-vehicle-select>
+    </section>
+
+    <section class="card wide">
+      <app-product-select [products]="products"></app-product-select>
+    </section>
+
+    <section class="card wide preview-box">
+      <app-tank-preview [tankSlots]="calculateTankSlots()"></app-tank-preview>
+
+      <div class="print-actions">
+        <div class="print-summary">
+          <strong>Krävda checklistor: </strong> {{ getPrintJobs().length }} st
+          <span *ngFor="let j of getPrintJobs()" class="tag">{{ j.station }} ({{ j.products.length }} prod)</span>
+        </div>
+        <button class="btn primary" [disabled]="isGenerating" (click)="generateChecklists()">
+          {{ isGenerating ? 'Genererar...' : 'Generera Checklistor' }}
+        </button>
+      </div>
+
+      <div class="generated-list" *ngIf="generatedChecklists.length > 0">
+        <h4>Genererade checklistor</h4>
+        <div class="generated-item" *ngFor="let entry of generatedChecklists">
+          <div class="generated-item-info">
+            <strong>{{ entry.printJob.station }}</strong>
+            <span>{{ checklistTemplateLabel(entry.printJob.template) }}</span>
+            <span *ngIf="entry.wasEdited" class="badge info">Redigerad</span>
+          </div>
+          <div class="generated-item-actions">
+            <button class="btn secondary small" (click)="openEdit(entry)">Visa / Redigera</button>
+            <button class="btn primary small" (click)="printChecklist(entry)">Skriv ut</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<app-checklist-edit-modal
+  [isOpen]="editingChecklist !== null"
+  [isSaving]="isSavingEdit"
+  [request]="editingChecklist?.request ?? null"
+  (save)="onEditSave($event)"
+  (close)="closeEdit()"
+></app-checklist-edit-modal>

@@ -1,0 +1,7 @@
+<h3>3. Välj Produkter som lastas</h3>
+<div class="product-grid">
+  <label *ngFor="let p of products" class="checkbox-pill">
+    <input type="checkbox" [(ngModel)]="p.selected" (ngModelChange)="onToggle()" />
+    <span>{{ p.displayName }} <small>({{ p.unNumber }})</small></span>
+  </label>
+</div>

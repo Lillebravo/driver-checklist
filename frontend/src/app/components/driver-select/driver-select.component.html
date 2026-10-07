@@ -1,0 +1,25 @@
+<h3>1. Chaufför</h3>
+<label for="driverName">Sök eller skriv namn:</label>
+<input
+  id="driverName"
+  type="text"
+  [ngModel]="driverName"
+  (ngModelChange)="onNameInput($event)"
+  list="driverList"
+  placeholder="T.ex. Tony Blaffert"
+/>
+<datalist id="driverList">
+  <option *ngFor="let d of drivers" [value]="d.name"></option>
+</datalist>
+
+<div class="field-row">
+  <label for="adrExpiry">ADR Giltigt till:</label>
+  <input
+    id="adrExpiry"
+    type="date"
+    [ngModel]="adrExpiry"
+    (ngModelChange)="onAdrExpiryInput($event)"
+  />
+</div>
+
+<div *ngIf="isNewDriver" class="badge warning">Ny Chaufför (Manuell inmatning)</div>

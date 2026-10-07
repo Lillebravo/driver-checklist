@@ -1,0 +1,45 @@
+<h3>2. Fordonsekipage</h3>
+<label for="truckRegNr">Dragbil Reg.nr:</label>
+<input
+  id="truckRegNr"
+  type="text"
+  [ngModel]="truckRegNr"
+  (ngModelChange)="onTruckInput($event)"
+  list="truckList"
+  placeholder="T.ex. JAF 58E"
+/>
+<datalist id="truckList">
+  <option *ngFor="let t of trucks" [value]="t.regNr"></option>
+</datalist>
+
+<div *ngIf="isNewTruck" class="badge warning">Ny Dragbil</div>
+
+<div class="field-row">
+  <label for="trailer1Reg">Släpvagn 1:</label>
+  <input
+    id="trailer1Reg"
+    type="text"
+    [ngModel]="trailer1Reg"
+    (ngModelChange)="onTrailer1Input($event)"
+    list="trailerList"
+    placeholder="Välj eller skriv in nytt släp"
+  />
+  <div *ngIf="isNewTrailer1" class="badge warning">Nytt Släp 1</div>
+</div>
+
+<div class="field-row">
+  <label for="trailer2Reg">Släpvagn 2 (valfritt):</label>
+  <input
+    id="trailer2Reg"
+    type="text"
+    [ngModel]="trailer2Reg"
+    (ngModelChange)="onTrailer2Input($event)"
+    list="trailerList"
+    placeholder="Välj eller skriv in nytt släp"
+  />
+  <div *ngIf="isNewTrailer2" class="badge warning">Nytt Släp 2</div>
+</div>
+
+<datalist id="trailerList">
+  <option *ngFor="let tr of availableTrailers" [value]="tr.regNr">{{ tr.regNr }} (Godkänd: {{ tr.approvalExpiry }})</option>
+</datalist>
