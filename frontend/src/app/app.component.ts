@@ -106,6 +106,11 @@ export class AppComponent implements OnInit {
 
   onIsNewDriverChange(isNew: boolean): void {
     this.isNewDriver = isNew;
+    if (!isNew) {
+      this.akeri = 'PH Tank';
+    } else if (this.akeri === 'PH Tank') {
+      this.akeri = '';
+    }
 
     // Förvälj första kända bilen om chauffören är känd och ingen bil valts än.
     if (!isNew && this.trucks.length > 0 && !this.selectedTruckReg) {

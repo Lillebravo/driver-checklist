@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="DriverChecklist.Api/DriverChecklist.Api.csproj" />
+  <Project Path="DriverChecklist.Tests/DriverChecklist.Tests.csproj" />
 </Solution>

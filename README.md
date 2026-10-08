@@ -86,11 +86,15 @@ Domänmodellen för detta (`GenerateChecklistRequest`, `VehicleUnit`, `ProductDe
 2. Varje grupp matchas mot rätt Excel-mall via [TemplateResolver](backend/DriverChecklist.Api/Services/TemplateResolver.cs).
 3. Mallen fylls i via ClosedXML i minnet (`MemoryStream`) av [ChecklistGeneratorService](backend/DriverChecklist.Api/Services/ChecklistGeneratorService.cs):
    * Chaufför, ADR-giltighet, åkeri, datum/tid.
+   * När en känd chaufför väljs förifylls åkerifältet med `PH Tank`. Det kan ändras manuellt och följer med till Excel-kopian. Vid byte till okänd chaufför rensas `PH Tank`, men andra manuellt angivna åkerinamn behålls.
    * Dragbil och släpens registreringsnummer.
    * UN-nummer och produktnamn för just den checklistan.
    * Statusflaggor (`[NY CHAUFFÖR]`, `[NY DRAGBIL]`, `[NYTT SLÄP 1/2]`).
    * Check-in-kryssrutor, ADR-giltighet, tankkoder (Tank 1–4) och inspektionstyp/datum.
-   * Signaturfält på baksidan (operatör + datum).
+   * Självlastning kryssas bara för kända chaufförer, även efter Visa/Redigera. Full/halv assist kan fortfarande väljas manuellt.
+   * Signaturfält på baksidan: endast namnen placeras nederst till höger i separata textfält; mallens instruktionstext och dess placering lämnas orörda. Tredje namnfältet lämnas tomt.
+   * Datumen på baksidan är centrerade i datumrutorna med 14 punkters text.
+   * Mallens ritobjekt och bildrotationer bevaras, inklusive den horisontella Kemira-loggan.
 4. Filen returneras direkt till frontend som nedladdning (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`), skrivs aldrig till disk på servern.
 
 ### Tankplatslogik (Tank 1–4)
@@ -183,11 +187,17 @@ npm start
 # Backend
 cd backend
 dotnet build
+dotnet run --project DriverChecklist.Tests -- ".\DriverChecklist.Api\Templates"
 
 # Frontend
 cd frontend
 npm test -- --watch=false --browsers=ChromeHeadless
 ```
+
+Backendens regressionstest kräver de två riktiga Excel-mallarna i den angivna
+mappen (byt sökvägen om de ligger på Skrivbordet). Det verifierar båda mallarna
+med kända/nya chaufförer och alla assistansval, inklusive ritobjektens rotation,
+namnens placering, datumformat och att mallfilerna inte ändras.
 
 ---
 

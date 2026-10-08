@@ -1,7 +1,12 @@
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Spreadsheet;
 using DriverChecklist.Api.Models;
 using DriverChecklist.Api.Models.Enums;
+using Drawing = DocumentFormat.OpenXml.Drawing;
+using SpreadsheetDrawing = DocumentFormat.OpenXml.Drawing.Spreadsheet;
 
 namespace DriverChecklist.Api.Services;
 
@@ -43,10 +48,12 @@ public class ChecklistGeneratorService : IChecklistGeneratorService
         FillCheckIn(sheet, request);
         FillRoleCheckboxes(sheet, request);
         FillUtcheckning(sheet, request);
-        FillSignature(sheet, request);
+        FillSignature(sheet);
 
         var outputStream = new MemoryStream();
         workbook.SaveAs(outputStream);
+        templateStream.Position = 0;
+        PreserveDrawingsAndAddNames(templateStream, outputStream, request);
         outputStream.Position = 0;
 
         var fileName = $"Checklista_{request.Truck.RegNr}_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
@@ -125,11 +132,12 @@ public class ChecklistGeneratorService : IChecklistGeneratorService
         sheet.Cell("E15").Value = ReplaceAfterLabel(e15, "Giltighet:", $" {req.DriverAdrExpiry:yyyy-MM-dd}");
 
         // E16: Kryssa i vald lastningsassistans (redigerbar i Visa/Redigera-modalen).
-        // Unspecified (ny/okänd chaufför) kryssar medvetet ingenting alls.
-        if (req.AssistType != AssistType.Unspecified)
+        // Självlastning kräver en känd chaufför, även vid ett manuellt assistansval.
+        var assistType = EffectiveAssistType(req);
+        if (assistType != AssistType.Unspecified)
         {
             var e16 = sheet.Cell("E16").GetString();
-            sheet.Cell("E16").Value = TickCheckbox(e16, AssistMarker(req.AssistType));
+            sheet.Cell("E16").Value = TickCheckbox(e16, AssistMarker(assistType));
         }
 
         // E18: Tankkoder Tank 1, 2, 3, 4 (Bil först, sedan släpens fack i ordning)
@@ -159,7 +167,7 @@ public class ChecklistGeneratorService : IChecklistGeneratorService
         {
             var cell = sheet.Cell(address);
             var text = cell.GetString();
-            var updated = req.AssistType switch
+            var updated = EffectiveAssistType(req) switch
             {
                 AssistType.FullAssist => TickCheckbox(text, "Operatör(Full assist)"),
                 AssistType.HalfAssist => TickFirstMatch(text, "Halv assist"),
@@ -177,38 +185,122 @@ public class ChecklistGeneratorService : IChecklistGeneratorService
         sheet.Cell("A42").Value = TickCheckbox(a42, "Vakt");
     }
 
-    private static void FillSignature(IXLWorksheet sheet, GenerateChecklistRequest req)
+    private static void FillSignature(IXLWorksheet sheet)
     {
         var today = DateTime.Now.ToString("yyyy-MM-dd");
 
-        // Rad 46 (översta namnfältet): Vaktens namn, skrivet på en ny rad
-        // under mallens befintliga text, högerjusterat i rutan.
-        AppendNameBelow(sheet.Cell("A46"), req.OperatorName);
-        sheet.Cell("B46").Value = today;
-
-        // Rad 47 (andra namnfältet): "Operator el Chaufför (Självlastande)" -
-        // endast vid Full assist är det operatören som utfört arbetet,
-        // annars (Halv assist/Själv lastn/ospecificerat) är det chauffören.
-        var row47Name = req.AssistType == AssistType.FullAssist ? req.OperatorName : req.DriverName;
-        AppendNameBelow(sheet.Cell("A47"), row47Name);
-        sheet.Cell("B47").Value = today;
-
-        // Rad 48 (tredje namnfältet): lämnas helt orört (inget namn skrivs
-        // in) - endast datumet fylls i.
-        sheet.Cell("B48").Value = today;
+        for (var row = 46; row <= 48; row++)
+        {
+            var cell = sheet.Cell(row, 2);
+            cell.Value = today;
+            cell.Style.Font.FontSize = 14;
+            cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            cell.Style.Alignment.WrapText = false;
+        }
     }
 
-    /// <summary>
-    /// Lägger till namnet på en ny rad under mallens befintliga instruktionstext
-    /// och högerjusterar cellen, så att namnet hamnar längst ner till höger i
-    /// rutan - utan att röra den ursprungliga texten eller tränga in i
-    /// datum-/signaturcellerna bredvid (Excel klipper överflöd vid cellgränsen
-    /// eftersom datumcellen bredvid alltid innehåller text).
-    /// </summary>
-    private static void AppendNameBelow(IXLCell cell, string name)
+    private static AssistType EffectiveAssistType(GenerateChecklistRequest req) =>
+        req.IsNewDriver && req.AssistType == AssistType.SelfLoading
+            ? AssistType.Unspecified
+            : req.AssistType;
+
+    private static void PreserveDrawingsAndAddNames(
+        Stream templateStream, Stream outputStream, GenerateChecklistRequest req)
     {
-        cell.Value = cell.GetString() + "\n" + name;
-        cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+        using var template = SpreadsheetDocument.Open(templateStream, false);
+        using var output = SpreadsheetDocument.Open(outputStream, true);
+        var templateWorkbook = template.WorkbookPart!;
+        var outputWorkbook = output.WorkbookPart!;
+        var templateSheet = templateWorkbook.Workbook.Sheets!.Elements<Sheet>().First();
+        var outputSheet = outputWorkbook.Workbook.Sheets!.Elements<Sheet>().First();
+        var templatePart = (WorksheetPart)templateWorkbook.GetPartById(templateSheet.Id!);
+        var outputPart = (WorksheetPart)outputWorkbook.GetPartById(outputSheet.Id!);
+
+        // ClosedXML tappar bildrotationer och textformer. Kopiera hela ritdelen,
+        // inklusive bildrelationer, innan de separata namnfälten läggs till.
+        if (outputPart.DrawingsPart is { } oldDrawings)
+        {
+            outputPart.DeletePart(oldDrawings);
+        }
+        outputPart.Worksheet.RemoveAllChildren<DocumentFormat.OpenXml.Spreadsheet.Drawing>();
+
+        var drawings = templatePart.DrawingsPart is { } originalDrawings
+            ? outputPart.AddPart(originalDrawings)
+            : outputPart.AddNewPart<DrawingsPart>();
+        drawings.WorksheetDrawing ??= new SpreadsheetDrawing.WorksheetDrawing();
+        outputPart.Worksheet.AddChild(new DocumentFormat.OpenXml.Spreadsheet.Drawing
+        {
+            Id = outputPart.GetIdOfPart(drawings),
+        });
+
+        var nextId = drawings.WorksheetDrawing
+            .Descendants<SpreadsheetDrawing.NonVisualDrawingProperties>()
+            .Select(properties => properties.Id?.Value ?? 0U)
+            .DefaultIfEmpty(0U).Max() + 1;
+        AddName(drawings.WorksheetDrawing, 46, req.OperatorName, nextId);
+        var row47Name = req.AssistType == AssistType.FullAssist ? req.OperatorName : req.DriverName;
+        AddName(drawings.WorksheetDrawing, 47, row47Name, nextId + 1);
+        drawings.WorksheetDrawing.Save();
+        outputPart.Worksheet.Save();
+    }
+
+    private static void AddName(
+        SpreadsheetDrawing.WorksheetDrawing drawings, int row, string name, uint id)
+    {
+        var shape = new SpreadsheetDrawing.Shape(
+            new SpreadsheetDrawing.NonVisualShapeProperties(
+                new SpreadsheetDrawing.NonVisualDrawingProperties
+                {
+                    Id = id,
+                    Name = $"ChecklistName{row}",
+                },
+                new SpreadsheetDrawing.NonVisualShapeDrawingProperties { TextBox = true }),
+            new SpreadsheetDrawing.ShapeProperties(
+                new Drawing.PresetGeometry(new Drawing.AdjustValueList())
+                {
+                    Preset = Drawing.ShapeTypeValues.Rectangle,
+                },
+                new Drawing.NoFill(),
+                new Drawing.Outline(new Drawing.NoFill())),
+            new SpreadsheetDrawing.TextBody(
+                new Drawing.BodyProperties
+                {
+                    Anchor = Drawing.TextAnchoringTypeValues.Bottom,
+                    LeftInset = 38100,
+                    RightInset = 38100,
+                    TopInset = 38100,
+                    BottomInset = 38100,
+                    Wrap = Drawing.TextWrappingValues.Square,
+                },
+                new Drawing.ListStyle(),
+                new Drawing.Paragraph(
+                    new Drawing.ParagraphProperties { Alignment = Drawing.TextAlignmentTypeValues.Right },
+                    new Drawing.Run(
+                        new Drawing.RunProperties(
+                            new Drawing.SolidFill(new Drawing.RgbColorModelHex { Val = "000000" }),
+                            new Drawing.LatinFont { Typeface = "Arial" })
+                        {
+                            FontSize = 1800,
+                        },
+                        new Drawing.Text(name)))));
+
+        drawings.Append(new SpreadsheetDrawing.TwoCellAnchor(
+            new SpreadsheetDrawing.FromMarker(
+                new SpreadsheetDrawing.ColumnId("0"),
+                new SpreadsheetDrawing.ColumnOffset("0"),
+                new SpreadsheetDrawing.RowId((row - 1).ToString()),
+                new SpreadsheetDrawing.RowOffset("0")),
+            new SpreadsheetDrawing.ToMarker(
+                new SpreadsheetDrawing.ColumnId("1"),
+                new SpreadsheetDrawing.ColumnOffset("0"),
+                new SpreadsheetDrawing.RowId(row.ToString()),
+                new SpreadsheetDrawing.RowOffset("0")),
+            shape,
+            new SpreadsheetDrawing.ClientData())
+        {
+            EditAs = SpreadsheetDrawing.EditAsValues.TwoCell,
+        });
     }
 
     private static string FormatInspection(TankSlot? slot)
