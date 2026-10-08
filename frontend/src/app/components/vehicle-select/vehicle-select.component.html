@@ -21,9 +21,17 @@
     type="text"
     [ngModel]="trailer1Reg"
     (ngModelChange)="onTrailer1Input($event)"
-    list="trailerList"
+    role="combobox"
+    aria-autocomplete="list"
+    [attr.aria-expanded]="activeTrailer === 1"
+    aria-controls="trailer-options-1"
+    autocomplete="off"
+    (focus)="activeTrailer = 1; activeSuggestion = -1"
+    (blur)="activeTrailer = null"
+    (keydown)="onTrailerKey($event, 1)"
     placeholder="Välj eller skriv in nytt släp"
   />
+  <ng-container *ngTemplateOutlet="suggestions; context: { slot: 1 }"></ng-container>
   <div *ngIf="isNewTrailer1" class="badge warning">Nytt Släp 1</div>
 </div>
 
@@ -34,12 +42,31 @@
     type="text"
     [ngModel]="trailer2Reg"
     (ngModelChange)="onTrailer2Input($event)"
-    list="trailerList"
+    role="combobox"
+    aria-autocomplete="list"
+    [attr.aria-expanded]="activeTrailer === 2"
+    aria-controls="trailer-options-2"
+    autocomplete="off"
+    (focus)="activeTrailer = 2; activeSuggestion = -1"
+    (blur)="activeTrailer = null"
+    (keydown)="onTrailerKey($event, 2)"
     placeholder="Välj eller skriv in nytt släp"
   />
+  <ng-container *ngTemplateOutlet="suggestions; context: { slot: 2 }"></ng-container>
   <div *ngIf="isNewTrailer2" class="badge warning">Nytt Släp 2</div>
 </div>
 
-<datalist id="trailerList">
-  <option *ngFor="let tr of availableTrailers" [value]="tr.regNr">{{ tr.regNr }} (Godkänd: {{ tr.approvalExpiry }})</option>
-</datalist>
+<ng-template #suggestions let-slot="slot">
+  <div *ngIf="activeTrailer === slot" class="trailer-options" role="listbox" [id]="'trailer-options-' + slot" aria-label="Registrerade släp">
+    <div *ngFor="let group of trailerGroups" class="trailer-group">
+      <strong>{{ group.label }}</strong>
+      <span *ngIf="group.trailers.length === 0" class="empty">Inga matchande släp</span>
+      <button *ngFor="let trailer of group.trailers" type="button" role="option"
+        [attr.aria-selected]="isActiveSuggestion(trailer.regNr)"
+        [class.active]="isActiveSuggestion(trailer.regNr)"
+        (mousedown)="$event.preventDefault()" (click)="selectTrailer(slot, trailer.regNr)">
+        {{ trailer.regNr }} <small>Godkänd: {{ trailer.approvalExpiry }}</small>
+      </button>
+    </div>
+  </div>
+</ng-template>

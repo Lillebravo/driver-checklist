@@ -13,12 +13,13 @@ Ett internt webbaserat verktyg för utlastning av kemikalier. Systemet slår upp
 2. **Välj / Fyll i Fordonsekipage:**
    * När chauffören valts visas en lista över fordon som chauffören brukar köra.
    * Operatören kan välja en befintlig dragbil eller skriva in ett nytt registreringsnummer manuellt (flaggar som `Ny Dragbil`).
-   * **Släpvagnar:** Operatören kan välja eller fylla i upp till **2 släpvagnar** (Släp 1 och Släp 2) med respektive besiktningsdatum, trycktestdatum och tankkod. Manuellt inmatade släp flaggas som `Nytt Släp 1` respektive `Nytt Släp 2`.
+   * **Släpvagnar:** Operatören kan välja eller fylla i upp till **2 släpvagnar**. Söklistan visar bilens vanliga släp först och övriga registrerade släp under en avskiljare. Registreringsnummer jämförs utan skillnad på mellanslag eller stora/små bokstäver. Ett släp är nytt endast om det saknas i hela registret; tankuppgifter hämtas även när släpet används med en annan eller ny bil.
 3. **Välj Produkter:**
    * Operatören bockar för vilka produkter som ska lastas under transporten.
 4. **Generera, Visa/Redigera & Skriv Ut:**
    * Motorn beräknar hur många och vilka checklistor som krävs baserat på utlastningsplatser och malltyper.
-   * Vid nya chaufförer/fordon stämplas tydliga textmarkeringar (`[NY CHAUFFÖR]`, `[NY DRAGBIL]`, `[NYTT SLÄP 1]`, `[NYTT SLÄP 2]`) på checklistan så att transportledare vet att uppgifterna ska föras in i master-Excelen manuellt i efterhand.
+   * Före generering kan varje planerad checklista öppnas med **Redigera första sidan** och sparas som utkast.
+   * **NY CHAUFFÖR** skrivs i fetstil efter ADR-datumet. **NY BIL** och **NY SLÄP** skrivs i fetstil efter respektive giltighetsdatum vid godkännandecertifikatet. SAP-/mängdraden används inte för statusflaggor.
    * Varje genererad checklista får två knappar: **Visa/Redigera** (öppnar ett formulär i en modal på sidan - ingen ny flik - för att rätta till fel innan utskrift, se avsnitt 4) och **Skriv ut** (laddar ner Excel-filen så operatören kan öppna den och skriva ut via Ctrl+P). Ingen data skrivs tillbaka till master-Excel-filen.
 
 ---
@@ -65,16 +66,15 @@ Ett internt webbaserat verktyg för utlastning av kemikalier. Systemet slår upp
 
 ## 3. Ekipage- och Flagglogik (Ny Chaufför / Fordon)
 
-Eftersom Excel-filen är delad via Microsoft Teams/SharePoint och öppnas i **read-only** sker inga databasskrivningar från systemet. För att uppmärksamma manuell registrering sätts tydliga textmarkeringar i checklistan:
+Eftersom Excel-filen är delad via Microsoft Teams/SharePoint och öppnas i **read-only** sker inga databasskrivningar från systemet. Markeringarna placeras vid relevanta kontrollpunkter:
 
 ```text
-┌────────────────────────────────────────────────────────┐
-│              STATUS FÖR REGISTRERING                   │
-│                                                        │
-│ [X] NY CHAUFFÖR   [ ] NY DRAGBIL   [X] NYTT SLÄP 1     │
-│ (Förs in manuellt i fordonsregistret av transportledare)│
-└────────────────────────────────────────────────────────┘
+ADR (E15): Giltighet: 2028-10-08 NY CHAUFFÖR
+Godkännandecertifikat (E17): Bil: 2028-04-05 NY BIL
+                           Släp 1: 2028-06-07 NY SLÄP
 ```
+
+Endast markeringstexten läggs till som fetstilt rich text. Bil och släp kan båda markeras i samma checklista. Ett registrerat släp blir inte nytt bara för att det kopplas till en annan bil.
 
 Domänmodellen för detta (`GenerateChecklistRequest`, `VehicleUnit`, `ProductDefinition`, `ChecklistTemplate`-enumet) finns i [backend/DriverChecklist.Api/Models](backend/DriverChecklist.Api/Models).
 
@@ -89,7 +89,7 @@ Domänmodellen för detta (`GenerateChecklistRequest`, `VehicleUnit`, `ProductDe
    * När en känd chaufför väljs förifylls åkerifältet med `PH Tank`. Det kan ändras manuellt och följer med till Excel-kopian. Vid byte till okänd chaufför rensas `PH Tank`, men andra manuellt angivna åkerinamn behålls.
    * Dragbil och släpens registreringsnummer.
    * UN-nummer och produktnamn för just den checklistan.
-   * Statusflaggor (`[NY CHAUFFÖR]`, `[NY DRAGBIL]`, `[NYTT SLÄP 1/2]`).
+   * Fetstilta ny-markeringar vid ADR-giltighet respektive godkännandecertifikat.
    * Check-in-kryssrutor, ADR-giltighet, tankkoder (Tank 1–4) och inspektionstyp/datum.
    * Självlastning kryssas bara för kända chaufförer, även efter Visa/Redigera. Full/halv assist kan fortfarande väljas manuellt.
    * Signaturfält på baksidan: endast namnen placeras nederst till höger i separata textfält; mallens instruktionstext och dess placering lämnas orörda. Tredje namnfältet lämnas tomt.
@@ -110,7 +110,12 @@ Beräknas i frontend av [TankCalculationService](frontend/src/app/services/tank-
 
 Efter att en checklista genererats laddas den **inte** ner automatiskt. Den visas istället som ett kort under "Genererade checklistor" med två knappar:
 
-* **Visa / Redigera** öppnar [ChecklistEditModalComponent](frontend/src/app/components/checklist-edit-modal/checklist-edit-modal.component.ts) - en modal direkt på sidan (ingen ny flik/fönster) med ett formulär förifyllt med exakt samma värden som skickades till backend vid genereringen (chaufför, ADR, åkeri, dragbil, släp, tankkoder). Produkterna visas read-only eftersom de styrs av produktvalet i steg 3. Vid **"Spara & uppdatera"** skickas det redigerade formuläret igenom samma `/api/checklist/generate`-endpoint igen, vilket regenererar Excel-filen i minnet med de rättade värdena - exakt samma fyllnadslogik som vid den ursprungliga genereringen återanvänds, så resultatet garanteras bli konsekvent. Checklistan märks då med en "Redigerad"-badge.
+* **Redigera första sidan** finns även innan någon fil har genererats. **Spara utkast** sparar endast i webbsessionens minne; ingen fil skapas. Vid nästa generering används utkastet. Om underlaget ändras måste utkastet granskas och sparas igen.
+* **Visa / Redigera** öppnar samma [ChecklistEditModalComponent](frontend/src/app/components/checklist-edit-modal/checklist-edit-modal.component.ts) efter generering. **Spara & uppdatera** regenererar Excel-kopian med ändringarna.
+* Det moderna formuläret följer första sidans fält och ordning: datum/tid, åkeri, chaufför, bil/släp, SAP-nummer, mängd, container/vagn, UN-nummer, samtliga kontrollrader, roller, TT/TC/RC-kryss, kommentarer, ADR-/certifikatdatum, assistans, fyra tankkoder/inspektioner och sex fackvolymer. Grå rutor är spärrade precis som i mallen. Avmarkeringar ersätter automatiska kryss.
+* Kontrollfrågor, roller, tillåtna krysskolumner och UN-nummer läses read-only från Excel via `GET /api/checklist/first-page/{templateType}`. Samma komponent fungerar för båda mallarna.
+* Alla produkter finns i en gemensam dropdown. Produkter vid samma station kan kombineras; byte till en annan station byter produktgrupp och vid behov mall. Separata stationer genereras fortfarande som separata checklistor. Typ 3 kräver fortfarande en fysisk mall.
+* Fel vid malläsning eller uppdatering visas i redigeraren. Utkast och genererade filer finns bara i minnet och försvinner vid omladdning.
 * **Skriv ut** laddar ner den (eventuellt redigerade) Excel-filen till datorn. Webbläsare kan inte skicka en `.xlsx`-fil direkt till en skrivare - filen öppnas i Excel (eller valfritt kalkylprogram) där operatören trycker Ctrl+P för att skriva ut.
 
 ---

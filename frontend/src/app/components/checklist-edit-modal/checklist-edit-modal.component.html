@@ -1,123 +1,130 @@
-<div class="modal-backdrop" *ngIf="isOpen" (click)="onClose()">
-  <div class="modal-panel" (click)="$event.stopPropagation()" *ngIf="model as m">
+<div class="modal-backdrop" *ngIf="isOpen" (click)="onClose()" (keydown.escape)="onClose()">
+  <div class="modal-panel checklist-panel" role="dialog" aria-modal="true" aria-labelledby="editor-title"
+    (click)="$event.stopPropagation()" *ngIf="model as m">
     <header class="modal-header">
-      <h3>Redigera checklista</h3>
-      <button type="button" class="btn-icon" (click)="onClose()" aria-label="Stäng">✕</button>
+      <div>
+        <small>FARLIGT GODS · FÖRSTA SIDAN</small>
+        <h3 id="editor-title">{{ isDraft ? 'Granska och fyll i checklista' : 'Redigera checklista' }}</h3>
+      </div>
+      <button type="button" class="btn-icon" [disabled]="isSaving" (click)="onClose()" aria-label="Stäng">✕</button>
     </header>
-
     <div class="modal-body">
-      <section class="form-section">
-        <h4>Chaufför</h4>
-        <div class="form-grid">
-          <label>
-            Namn
-            <input type="text" [(ngModel)]="m.driverName" />
-          </label>
-          <label>
-            ADR giltigt till
-            <input type="date" [(ngModel)]="m.driverAdrExpiry" />
-          </label>
-        </div>
-        <label class="checkbox-row">
-          <input type="checkbox" [(ngModel)]="m.isNewDriver" />
-          Ny Chaufför
-        </label>
-        <label>
-          Lastningsassistans
-          <select [(ngModel)]="m.assistType">
-            <option *ngFor="let a of assistTypeOptions" [ngValue]="a">{{ assistTypeLabel(a) }}</option>
-          </select>
-        </label>
-      </section>
-
-      <section class="form-section">
-        <h4>Åkeri & Operatör</h4>
-        <div class="form-grid">
-          <label>
-            Åkeri
-            <input type="text" [(ngModel)]="m.akeri" />
-          </label>
-          <label>
-            Operatör / Vakt
-            <input type="text" [(ngModel)]="m.operatorName" list="operatorListEdit" />
-            <datalist id="operatorListEdit">
-              <option *ngFor="let o of operators" [value]="o"></option>
-            </datalist>
-          </label>
-        </div>
-      </section>
-
-      <section class="form-section">
-        <h4>Dragbil</h4>
-        <div class="form-grid">
-          <label>
-            Reg.nr
-            <input type="text" [(ngModel)]="m.truck.regNr" />
-          </label>
-        </div>
-        <label class="checkbox-row">
-          <input type="checkbox" [(ngModel)]="m.truck.isNew" />
-          Ny Dragbil
-        </label>
-      </section>
-
-      <section class="form-section" *ngIf="m.trailers.length > 0">
-        <h4>Släpvagnar</h4>
-        <div class="form-grid" *ngFor="let trailer of m.trailers; let i = index">
-          <label>
-            Släp {{ i + 1 }} Reg.nr
-            <input type="text" [(ngModel)]="trailer.regNr" />
-          </label>
-          <label class="checkbox-row">
-            <input type="checkbox" [(ngModel)]="trailer.isNew" />
-            Nytt Släp {{ i + 1 }}
-          </label>
-        </div>
-      </section>
-
-      <section class="form-section" *ngIf="m.tankSlots.length > 0">
-        <h4>Tankplatser</h4>
-        <table class="edit-table">
-          <thead>
-            <tr>
-              <th>Tank</th>
-              <th>Tankkod</th>
-              <th>Typ</th>
-              <th>Senaste (åååå-mm)</th>
-              <th>Giltig t.o.m (åååå-mm)</th>
-              <th>Utgången</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let slot of m.tankSlots; let i = index">
-              <td>Tank {{ i + 1 }}</td>
-              <td><input type="text" [(ngModel)]="slot.tankCode" /></td>
-              <td>
-                <select [(ngModel)]="slot.inspectionType">
-                  <option value="L">L</option>
-                  <option value="P">P</option>
+      <div *ngIf="error" class="error-banner" role="alert">{{ error }}</div>
+      <div *ngIf="saveError" class="error-banner" role="alert">{{ saveError }}</div>
+      <p *ngIf="loading" role="status">Läser checklistemallen...</p>
+      <button *ngIf="!definition && !loading" class="btn secondary" (click)="loadDefinition()">Försök igen</button>
+      <ng-container *ngIf="page as p">
+        <ng-container *ngIf="definition as d">
+          <section class="sheet-section">
+            <h4>Generell information</h4>
+            <div class="header-grid">
+              <label>Datum/Tid<input type="datetime-local" [(ngModel)]="timestampLocal" /></label>
+              <label>Åkeri<input type="text" [(ngModel)]="m.akeri" /></label>
+              <label>Chaufförens namn<input type="text" [(ngModel)]="m.driverName" /></label>
+              <div class="registrations">
+                <label>Reg nr. Bil<input type="text" [(ngModel)]="m.truck.regNr" (ngModelChange)="updateVehicleStatus(m.truck, true)" /></label>
+                <div *ngFor="let trailer of m.trailers; let i = index">
+                  <label>Släp {{ i + 1 }}<input type="text" [(ngModel)]="trailer.regNr" (ngModelChange)="updateVehicleStatus(trailer)" /></label>
+                  <button class="btn secondary small" (click)="removeTrailer(i)">Ta bort släp {{ i + 1 }}</button>
+                </div>
+                <button *ngIf="m.trailers.length < 2" class="btn secondary small" (click)="addTrailer()">Lägg till släp</button>
+              </div>
+              <label>Kemira SAP Nr<input type="text" [(ngModel)]="p.sapNumber" /></label>
+              <label>Preliminär lastningsmängd (ton)<input type="text" inputmode="decimal" [(ngModel)]="p.loadingAmount" /></label>
+              <label>Container/Järnvägsvagns nr<input type="text" [(ngModel)]="p.containerNumber" /></label>
+              <div>
+                <label>UN Nummer</label>
+                <div class="inline-options">
+                  <label *ngFor="let number of d.unNumbers"><input type="checkbox" [ngModel]="p.unNumbers.includes(number)"
+                    (ngModelChange)="toggle(p.unNumbers, number, $event)" />{{ number }}</label>
+                </div>
+              </div>
+              <div class="products">
+                <label for="edit-product">Produktnamn</label>
+                <select id="edit-product" [ngModel]="productToAdd" (ngModelChange)="addProduct($event)">
+                  <option value="">Välj produkt att lägga till...</option>
+                  <option *ngFor="let product of products" [value]="product.code">{{ product.displayName }}</option>
                 </select>
-              </td>
-              <td><input type="text" [(ngModel)]="slot.lastInspectionMonthYear" placeholder="2025-06" /></td>
-              <td><input type="text" [(ngModel)]="slot.expiryFormatted" placeholder="2028-06" /></td>
-              <td><input type="checkbox" [(ngModel)]="slot.isExpired" /></td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-
-      <section class="form-section">
-        <h4>Produkter (ändras i steg 3)</h4>
-        <ul class="readonly-list">
-          <li *ngFor="let p of m.selectedProducts">{{ p.name }} ({{ p.unNumber }})</li>
-        </ul>
-      </section>
+                <div class="product-tags">
+                  <button *ngFor="let product of m.selectedProducts; let i = index" (click)="removeProduct(i)"
+                    [attr.aria-label]="'Ta bort ' + product.name">{{ product.name }} <span aria-hidden="true">×</span></button>
+                </div>
+                <small>Produkter på samma station kan kombineras. Val av annan station byter produkter och checklistemall.</small>
+              </div>
+            </div>
+          </section>
+          <p class="safety-notice">Om en fråga besvaras med NEJ måste problemet rättas till innan lastning eller rapporteras till Expeditionen. Checklistan ersätter inte chaufförens ansvar.</p>
+          <section class="sheet-section" *ngFor="let section of sections; trackBy: trackRow">
+            <div class="section-heading">
+              <h4>{{ section.title }}</h4>
+              <div class="inline-options">
+                <label *ngFor="let role of section.roles"><input type="checkbox" [ngModel]="section.selected.includes(role)"
+                  [disabled]="!roleAllowed(role)" (ngModelChange)="toggle(section.selected, role, $event)" />{{ role }}</label>
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table class="checklist-table">
+                <thead><tr><th>Kontrollpunkt</th><th>TT<br />Ja</th><th>TC<br />Ja</th><th>RC<br />Ja</th><th>Kommentarer / uppgifter</th></tr></thead>
+                <tbody>
+                  <tr *ngFor="let row of section.rows; trackBy: trackRow">
+                    <td class="question">{{ row.question }}<small>{{ row.instruction }}</small></td>
+                    <td class="check" [class.unavailable]="!row.enabled[0]"><input type="checkbox" [(ngModel)]="row.value.tt" [disabled]="!row.enabled[0]" [attr.aria-label]="'TT Ja: ' + row.question" /></td>
+                    <td class="check" [class.unavailable]="!row.enabled[1]"><input type="checkbox" [(ngModel)]="row.value.tc" [disabled]="!row.enabled[1]" [attr.aria-label]="'TC Ja: ' + row.question" /></td>
+                    <td class="check" [class.unavailable]="!row.enabled[2]"><input type="checkbox" [(ngModel)]="row.value.rc" [disabled]="!row.enabled[2]" [attr.aria-label]="'RC Ja: ' + row.question" /></td>
+                    <td class="details">
+                      <ng-container [ngSwitch]="row.row">
+                        <div *ngSwitchCase="15">
+                          <label>Giltighet<input type="date" [(ngModel)]="m.driverAdrExpiry" /></label>
+                          <label class="inline-check"><input type="checkbox" [(ngModel)]="m.isNewDriver" (ngModelChange)="changeDriverStatus()" /><strong>NY CHAUFFÖR</strong></label>
+                        </div>
+                        <div *ngSwitchCase="16" class="assist-options">
+                          <label *ngFor="let assist of assistTypeOptions" [hidden]="!availableAssist(assist)">
+                            <input type="radio" name="assist" [ngModel]="m.assistType" [value]="assist" (ngModelChange)="changeAssist($event)" />{{ assistTypeLabel(assist) }}
+                          </label>
+                          <small>Ej godkänd självlastare ska lastas av Operatör.</small>
+                        </div>
+                        <div *ngSwitchCase="17">
+                          <label>Bil – giltighet<input type="date" [(ngModel)]="m.truck.approvalExpiry" /></label>
+                          <label class="inline-check"><input type="checkbox" [(ngModel)]="m.truck.isNew" /><strong>NY BIL</strong></label>
+                          <div *ngFor="let trailer of m.trailers; let i = index">
+                            <label>Släp {{ i + 1 }} – giltighet<input type="date" [(ngModel)]="trailer.approvalExpiry" /></label>
+                            <label class="inline-check"><input type="checkbox" [(ngModel)]="trailer.isNew" /><strong>NY SLÄP</strong></label>
+                          </div>
+                        </div>
+                        <div *ngSwitchCase="18" class="tank-grid">
+                          <label *ngFor="let tank of m.tankSlots; let i = index">Tank {{ i + 1 }}<input type="text" [(ngModel)]="tank.tankCode" /></label>
+                        </div>
+                        <div *ngSwitchCase="19">
+                          <label>Inspektion typ &amp; (mån/år)</label>
+                          <div class="inspection" *ngFor="let tank of m.tankSlots; let i = index">
+                            <span>Tank {{ i + 1 }}</span>
+                            <label><input type="checkbox" [ngModel]="tank.inspectionType === 'L'" (ngModelChange)="setInspection(i, 'L', $event)" />L</label>
+                            <label><input type="checkbox" [ngModel]="tank.inspectionType === 'P'" (ngModelChange)="setInspection(i, 'P', $event)" />P</label>
+                            <input type="month" [(ngModel)]="tank.lastInspectionMonthYear" [attr.aria-label]="'Inspektionsdatum tank ' + (i + 1)" />
+                          </div>
+                        </div>
+                        <div *ngSwitchCase="25" class="tank-grid">
+                          <label *ngFor="let volume of p.compartmentVolumes; let i = index; trackBy: trackIndex">Fack {{ i + 1 }} (L)<input type="text" inputmode="decimal" [(ngModel)]="p.compartmentVolumes[i]" /></label>
+                        </div>
+                      </ng-container>
+                      <small *ngIf="row.commentInstruction">{{ row.commentInstruction }}</small>
+                      <label class="comment-label">Kommentar<textarea rows="2" [(ngModel)]="row.value.comment" [attr.aria-label]="'Kommentar: ' + row.question"></textarea></label>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <p class="legend">TT = Tank Truck · TC = Tank Container · RC = Railcar</p>
+          <label>Operatör / Vakt<input type="text" [(ngModel)]="m.operatorName" list="operatorListEdit" /></label>
+          <datalist id="operatorListEdit"><option *ngFor="let operator of operators" [value]="operator"></option></datalist>
+        </ng-container>
+      </ng-container>
     </div>
-
     <footer class="modal-footer">
-      <button type="button" class="btn secondary" (click)="onClose()">Avbryt</button>
-      <button type="button" class="btn primary" [disabled]="isSaving" (click)="onSave()">
-        {{ isSaving ? 'Sparar...' : 'Spara & uppdatera' }}
+      <button type="button" class="btn secondary" [disabled]="isSaving" (click)="onClose()">Avbryt</button>
+      <button type="button" class="btn primary" [disabled]="isSaving || loading || !definition" (click)="onSave()">
+        {{ isSaving ? 'Sparar...' : isDraft ? 'Spara utkast' : 'Spara & uppdatera' }}
       </button>
     </footer>
   </div>

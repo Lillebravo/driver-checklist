@@ -20,12 +20,13 @@ Ett internt webbaserat verktyg för utlastning av kemikalier. Systemet slår upp
 2. **Välj / Fyll i Fordonsekipage:**
    * När chauffören valts visas en lista över fordon som chauffören brukar köra.
    * Operatören kan välja en befintlig dragbil eller skriva in ett nytt registreringsnummer manuellt (flaggar som `Ny Dragbil`).
-   * **Släpvagnar:** Operatören kan välja eller fylla i upp till **2 släpvagnar** (Släp 1 och Släp 2) med respektive besiktningsdatum, trycktestdatum och tankkod. Manuellt inmatade släp flaggas som `Nytt Släp 1` respektive `Nytt Släp 2`.
+   * **Släpvagnar:** Upp till två släp. Bilens vanliga släp visas först, övriga registrerade släp under en avskiljare. Ny-status och tankuppgifter slås upp i hela registret, oberoende av bilkoppling och registreringsnumrets mellanslag/skiftläge.
 3. **Välj Produkter:**
    * Operatören bockar för vilka produkter som ska lastas under transporten.
 4. **Generera & Skriv Ut:**
    * Motorn beräknar hur många och vilka checklistor som krävs baserat på utlastningsplatser och malltyper.
-   * Vid nya chaufförer/fordon stämplas tydliga textmarkeringar (`[NY CHAUFFÖR]`, `[NY DRAGBIL]`, `[NYTT SLÄP 1]`, `[NYTT SLÄP 2]`) på checklistan så att transportledare vet att uppgifterna ska föras in i master-Excelen manuellt i efterhand.
+   * Vid ADR-giltigheten skrivs **NY CHAUFFÖR** i fetstil efter datumet. Vid godkännandecertifikatet skrivs **NY BIL** och/eller **NY SLÄP** i fetstil efter respektive datum.
+   * Första sidan kan redigeras före generering i ett modernt, mallbaserat formulär med samma fält, kryss och ordning. Alla produkter finns i en gemensam dropdown. Se [README avsnitt 4](../README.md#4-checklistegenerering) för det implementerade flödet.
    * Utskriftsjobb skickas till skrivaren via webbläsaren. Ingen data skrivs tillbaka till Excel-filen.
 
 ---
@@ -67,16 +68,15 @@ Ett internt webbaserat verktyg för utlastning av kemikalier. Systemet slår upp
 
 ## 3. Ekipage- och Flagglogik (Ny Chaufför / Fordon)
 
-Eftersom Excel-filen är delad via Microsoft Teams/SharePoint och öppnas i **read-only** sker inga databasskrivningar från systemet. För att uppmärksamma manuell registrering sätts tydliga textmarkeringar i fältet `Fält_StatusFlaggor`:
+Eftersom Excel-filen är delad via Microsoft Teams/SharePoint och öppnas i **read-only** sker inga databasskrivningar från systemet. Markeringarna placeras i E15 (ADR) och E17 (godkännandecertifikat), inte på SAP-/mängdraden:
 
 ```text
-               ┌────────────────────────────────────────────────────────┐
-               │              STATUS FÖR REGISTRERING                   │
-               │                                                        │
-               │ [X] NY CHAUFFÖR   [ ] NY DRAGBIL   [X] NYTT SLÄP 1     │
-               │ (Förs in manuellt i fordonsregistret av transportledare)│
-               └────────────────────────────────────────────────────────┘
+Giltighet: 2028-10-08 NY CHAUFFÖR
+Bil: 2028-04-05 NY BIL
+Släp 1: 2028-06-07 NY SLÄP
 ```
+
+Kodexemplen nedan beskriver den ursprungliga prototypen och är inte den aktuella implementationen. Gällande export- och redigeringslogik finns i [ChecklistGeneratorService](../backend/DriverChecklist.Api/Services/ChecklistGeneratorService.cs) och [README](../README.md).
 
 ```csharp
 public record Driver(

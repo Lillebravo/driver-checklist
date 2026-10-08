@@ -1,0 +1,10 @@
+@baseUrl = http://localhost:5000
+
+### First page of type 1
+GET {{baseUrl}}/api/checklist/first-page/0
+
+### First page of type 2
+GET {{baseUrl}}/api/checklist/first-page/1
+
+### Missing template
+GET {{baseUrl}}/api/checklist/first-page/99

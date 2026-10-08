@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Trailer, TankSlot } from '../models';
+import { normalizeRegNr } from '../core/vehicle-registry.util';
 
 /**
  * Beräknar Tank 1-4 i exakt ordning: Tank 1 är alltid dragbilen, därefter
@@ -34,7 +35,7 @@ export class TankCalculationService {
     });
 
     const addTrailerSlots = (trailerReg: string) => {
-      const trailer = availableTrailers.find((t) => t.regNr === trailerReg);
+      const trailer = availableTrailers.find((t) => normalizeRegNr(t.regNr) === normalizeRegNr(trailerReg));
       if (!trailer) {
         return;
       }

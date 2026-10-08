@@ -49,6 +49,7 @@ public class ChecklistGeneratorService : IChecklistGeneratorService
         FillRoleCheckboxes(sheet, request);
         FillUtcheckning(sheet, request);
         FillSignature(sheet);
+        FillFirstPage(sheet, request);
 
         var outputStream = new MemoryStream();
         workbook.SaveAs(outputStream);
@@ -63,13 +64,89 @@ public class ChecklistGeneratorService : IChecklistGeneratorService
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     }
 
+    public ChecklistPageResponse? GetFirstPage(ChecklistTemplate templateType)
+    {
+        var path = _templateResolver.ResolveTemplatePath(templateType);
+        if (path is null || !File.Exists(path)) return null;
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var workbook = new XLWorkbook(stream);
+        return ReadFirstPage(workbook.Worksheet(1));
+    }
+
+    private static ChecklistPageResponse ReadFirstPage(IXLWorksheet sheet)
+    {
+        var rows = new List<ChecklistRowResponse>();
+        var sections = new List<ChecklistSectionResponse>();
+        for (var row = 13; row <= 30; row++)
+        {
+            var text = sheet.Cell(row, 1).GetString().Trim();
+            if (text.Length == 0) continue;
+            if (text.Contains('□'))
+            {
+                sections.Add(new(row, text.Split('\n')[0].Trim(),
+                    Regex.Matches(text, @"□\s*([^□\r\n]+)").Select(m => m.Groups[1].Value.Trim()).ToList()));
+                continue;
+            }
+            var questionEnd = text.IndexOf('?');
+            var instructionStart = questionEnd >= 0 && questionEnd + 1 < text.Length ? questionEnd + 1 : -1;
+            var enabled = Enumerable.Range(2, 3).Select(column =>
+            {
+                var color = sheet.Cell(row, column).Style.Fill.BackgroundColor;
+                return color.ColorType != XLColorType.Theme || color.ThemeTint >= 0;
+            }).ToList();
+            rows.Add(new(row,
+                instructionStart < 0 ? text : text[..instructionStart].Trim(),
+                instructionStart < 0 ? "" : text[instructionStart..].Trim(),
+                new[] { 15, 16, 18, 19, 25 }.Contains(row) ? "" : sheet.Cell(row, 5).GetString(),
+                enabled));
+        }
+        return new(rows, sections,
+            Regex.Matches(sheet.Cell("A8").GetString(), @"UN\s*(\d+)").Select(m => $"UN {m.Groups[1].Value}").ToList(),
+            Regex.Matches(sheet.Cell("E16").GetString(), @"□\s*([^□\r\n]+)").Select(m => m.Groups[1].Value.Trim()).ToList());
+    }
+
+    public string? Validate(GenerateChecklistRequest request)
+    {
+        if (request.Truck is null || request.Trailers is null || request.TankSlots is null || request.SelectedProducts is null)
+            return "Transportuppgifterna är ofullständiga.";
+        if (request.TankSlots.Count > 4) return "Checklistan har plats för högst fyra tankar.";
+        if (request.FirstPage is not { } page) return null;
+        if (page.Rows is null || page.Roles is null || page.UnNumbers is null || page.CompartmentVolumes is null ||
+            page.Rows.Any(r => r is null) || page.Roles.Any(r => r is null || r.Selected is null))
+            return "Uppgifterna på checklistans första sida är ofullständiga.";
+        var definition = GetFirstPage(request.TemplateType);
+        if (definition is null) return null; // Generation returns the existing template-not-found response.
+        if (page.CompartmentVolumes.Count > 6) return "Checklistan har plats för högst sex fackvolymer.";
+        if (page.Rows.Select(r => r.Row).Distinct().Count() != page.Rows.Count ||
+            page.Rows.Any(r => !definition.Rows.Any(d => d.Row == r.Row)))
+            return "Ogiltiga kontrollrader på checklistans första sida.";
+        foreach (var row in page.Rows)
+        {
+            var enabled = definition.Rows.Single(d => d.Row == row.Row).Enabled;
+            if ((!enabled[0] && row.Tt) || (!enabled[1] && row.Tc) || (!enabled[2] && row.Rc))
+                return "En gråmarkerad kontrollruta kan inte kryssas i.";
+        }
+        if (page.Roles.Select(r => r.Row).Distinct().Count() != page.Roles.Count ||
+            page.Roles.Any(r => !definition.Sections.Any(d => d.Row == r.Row &&
+                r.Selected.All(s => d.Roles.Contains(s)))))
+            return "Ogiltig roll på checklistans första sida.";
+        if (request.IsNewDriver && page.Roles.Any(r => r.Selected.Any(s =>
+            s.Contains("Själv lastn", StringComparison.Ordinal) &&
+            !(s.Contains("Halv assist", StringComparison.Ordinal) && request.AssistType == AssistType.HalfAssist))))
+            return "En ny chaufför kan inte markeras som godkänd självlastare.";
+        if (page.UnNumbers.Any(n => !definition.UnNumbers.Contains(n)))
+            return "UN-numret finns inte i den valda checklistemallen.";
+        return null;
+    }
+
     private static void FillHeaderAndStatus(IXLWorksheet sheet, GenerateChecklistRequest req)
     {
         // A5: "Datum/Tid: ... Åkeri: ..." - sätt in värdena direkt efter
         // respektive etikett så att mallens egen mellanrumsbredd bevaras
         // (annars hamnar "Åkeri:" fel positionerat, precis som tidigare).
         var a5 = sheet.Cell("A5").GetString();
-        a5 = ReplaceAfterLabel(a5, "Datum/Tid:", $" {DateTime.Now:yyyy-MM-dd HH:mm}");
+        var timestamp = req.FirstPage?.Timestamp?.ToLocalTime() ?? DateTimeOffset.Now;
+        a5 = ReplaceAfterLabel(a5, "Datum/Tid:", $" {timestamp:yyyy-MM-dd HH:mm}");
         a5 = ReplaceAfterLabel(a5, "Åkeri:", $" {req.Akeri}");
         sheet.Cell("A5").Value = a5;
 
@@ -80,22 +157,6 @@ public class ChecklistGeneratorService : IChecklistGeneratorService
         a6 = ReplaceAfterLabel(a6, "Chaufförens namn:", $" {req.DriverName}");
         a6 = ReplaceAfterLabel(a6, "Reg nr. Bil-Släp:", $" {regSummary}");
         sheet.Cell("A6").Value = a6;
-
-        // A7: Kemira SAP Nr / Preliminär Lastnings Mängd - lämnas orört (fylls
-        // i för hand), men statusflaggor för nya aktörer läggs till sist i raden.
-        var flags = new List<string>();
-        if (req.IsNewDriver) flags.Add("[NY CHAUFFÖR]");
-        if (req.Truck.IsNew) flags.Add("[NY DRAGBIL]");
-        for (var i = 0; i < req.Trailers.Count; i++)
-        {
-            if (req.Trailers[i].IsNew) flags.Add($"[NYTT SLÄP {i + 1}]");
-        }
-
-        if (flags.Count > 0)
-        {
-            var a7 = sheet.Cell("A7").GetString();
-            sheet.Cell("A7").Value = $"{a7}   STATUS: {string.Join(" ", flags)}";
-        }
 
         // A8: UN Nummer - kryssa i rätt ruta/rutor utifrån valda produkters
         // UN-nummer, utan att röra "Container/Järnvägsvagns nr:"-etiketten.
@@ -130,6 +191,17 @@ public class ChecklistGeneratorService : IChecklistGeneratorService
         // E15: Chaufförens ADR-giltighet.
         var e15 = sheet.Cell("E15").GetString();
         sheet.Cell("E15").Value = ReplaceAfterLabel(e15, "Giltighet:", $" {req.DriverAdrExpiry:yyyy-MM-dd}");
+        if (req.IsNewDriver) sheet.Cell("E15").GetRichText().AddText(" NY CHAUFFÖR").SetBold();
+
+        var approval = sheet.Cell("E17").CreateRichText();
+        var vehicles = new[] { req.Truck }.Concat(req.Trailers).ToList();
+        for (var i = 0; i < vehicles.Count; i++)
+        {
+            if (i > 0) approval.AddText("\n");
+            var vehicle = vehicles[i];
+            approval.AddText($"{(i == 0 ? "Bil" : $"Släp {i}")}: {vehicle.ApprovalExpiry ?? "-"}");
+            if (vehicle.IsNew) approval.AddText(i == 0 ? " NY BIL" : " NY SLÄP").SetBold();
+        }
 
         // E16: Kryssa i vald lastningsassistans (redigerbar i Visa/Redigera-modalen).
         // Självlastning kräver en känd chaufför, även vid ett manuellt assistansval.
@@ -140,19 +212,59 @@ public class ChecklistGeneratorService : IChecklistGeneratorService
             sheet.Cell("E16").Value = TickCheckbox(e16, AssistMarker(assistType));
         }
 
-        // E18: Tankkoder Tank 1, 2, 3, 4 (Bil först, sedan släpens fack i ordning)
         sheet.Cell("E18").Value =
             "ADR/RID Tank kod el UN mobil Tank Instruktion:\n\n" +
             $"Tank 1:  {req.TankSlots.ElementAtOrDefault(0)?.TankCode ?? "-",-12} Tank 2: {req.TankSlots.ElementAtOrDefault(1)?.TankCode ?? "-",-12}\n\n" +
             $"Tank 3:  {req.TankSlots.ElementAtOrDefault(2)?.TankCode ?? "-",-12} Tank 4: {req.TankSlots.ElementAtOrDefault(3)?.TankCode ?? "-",-12}";
-
-        // E19: Inspektionstyp (L eller P) & Datum
         sheet.Cell("E19").Value =
             "Inspektion Typ & (mån/år)\n" +
             $"Tank 1:  {FormatInspection(req.TankSlots.ElementAtOrDefault(0))}\n" +
             $"Tank 2:  {FormatInspection(req.TankSlots.ElementAtOrDefault(1))}\n" +
             $"Tank 3:  {FormatInspection(req.TankSlots.ElementAtOrDefault(2))}\n" +
             $"Tank 4:  {FormatInspection(req.TankSlots.ElementAtOrDefault(3))}";
+    }
+
+    private static void FillFirstPage(IXLWorksheet sheet, GenerateChecklistRequest req)
+    {
+        if (req.FirstPage is not { } page) return;
+        var a7 = ReplaceAfterLabel(sheet.Cell("A7").GetString(), "Kemira SAP Nr:", $" {page.SapNumber}");
+        sheet.Cell("A7").Value = ReplaceAfterLabel(a7, "Preliminär Lastnings Mängd (ton):", $" {page.LoadingAmount}");
+        var a8 = ReplaceAfterLabel(sheet.Cell("A8").GetString(), "Container/Järnvägsvagns nr:", $" {page.ContainerNumber}");
+        a8 = a8.Replace('☒', '□');
+        foreach (var number in page.UnNumbers) a8 = TickCheckbox(a8, number);
+        sheet.Cell("A8").Value = a8;
+
+        foreach (var role in page.Roles)
+        {
+            var text = sheet.Cell(role.Row, 1).GetString().Replace('☒', '□');
+            foreach (var selected in role.Selected) text = TickCheckbox(text, selected);
+            sheet.Cell(role.Row, 1).Value = text;
+        }
+        if (page.CompartmentVolumes.Count > 0)
+        {
+            sheet.Cell("E25").Value = "Tank Volym i Liter (L)\n\n" +
+                string.Join("\n\n", Enumerable.Range(0, 3).Select(i =>
+                    $"Fack {i * 2 + 1}: {page.CompartmentVolumes.ElementAtOrDefault(i * 2) ?? ""}    " +
+                    $"Fack {i * 2 + 2}: {page.CompartmentVolumes.ElementAtOrDefault(i * 2 + 1) ?? ""}"));
+        }
+        foreach (var row in page.Rows)
+        {
+            var checks = new[] { row.Tt, row.Tc, row.Rc };
+            for (var i = 0; i < checks.Length; i++)
+            {
+                var cell = sheet.Cell(row.Row, i + 2);
+                cell.Value = checks[i] ? "X" : "";
+                cell.Style.Font.FontSize = 24;
+                cell.Style.Font.Bold = true;
+                cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+            }
+            if (!string.IsNullOrWhiteSpace(row.Comment))
+            {
+                var cell = sheet.Cell(row.Row, 5);
+                cell.GetRichText().AddText((cell.GetString().Length > 0 ? "\n" : "") + row.Comment);
+            }
+        }
     }
 
     /// <summary>
@@ -305,14 +417,14 @@ public class ChecklistGeneratorService : IChecklistGeneratorService
 
     private static string FormatInspection(TankSlot? slot)
     {
-        if (slot is null || string.IsNullOrWhiteSpace(slot.LastInspectionMonthYear))
+        if (slot is null)
         {
             return "□ L  □ P  (      /      )";
         }
 
         var lBox = slot.InspectionType == "L" ? "☒" : "□";
         var pBox = slot.InspectionType == "P" ? "☒" : "□";
-        return $"{lBox} L  {pBox} P  ({slot.LastInspectionMonthYear})";
+        return $"{lBox} L  {pBox} P  ({(string.IsNullOrWhiteSpace(slot.LastInspectionMonthYear) ? "      /      " : slot.LastInspectionMonthYear)})";
     }
 
     private static string AssistMarker(AssistType assistType) => assistType switch

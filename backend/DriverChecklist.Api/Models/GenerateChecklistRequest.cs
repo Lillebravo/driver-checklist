@@ -18,5 +18,6 @@ public record GenerateChecklistRequest(
     List<VehicleUnit> Trailers,
     List<TankSlot> TankSlots,
     List<ProductItem> SelectedProducts,
-    AssistType AssistType
+    AssistType AssistType,
+    ChecklistPage? FirstPage = null
 );

@@ -5,6 +5,7 @@ import { AssistType } from './assist-type.enum';
 export interface VehicleUnitRequest {
   regNr: string;
   isNew: boolean;
+  approvalExpiry?: string | null;
 }
 
 /** En vald produkt (namn, UN-nummer och produktfamilj) för en specifik checklista. */
@@ -36,5 +37,37 @@ export interface GenerateChecklistRequest {
   tankSlots: TankSlotRequest[];
   selectedProducts: ProductItemRequest[];
   assistType: AssistType;
+  firstPage?: ChecklistPage;
 }
 
+export interface ChecklistPage {
+  timestamp: string;
+  sapNumber: string;
+  loadingAmount: string;
+  containerNumber: string;
+  unNumbers: string[];
+  rows: ChecklistRowValue[];
+  roles: { row: number; selected: string[] }[];
+  compartmentVolumes: string[];
+}
+
+export interface ChecklistRowValue {
+  row: number;
+  tt: boolean;
+  tc: boolean;
+  rc: boolean;
+  comment: string;
+}
+
+export interface ChecklistPageResponse {
+  unNumbers: string[];
+  assistOptions: string[];
+  rows: {
+    row: number;
+    question: string;
+    instruction: string;
+    commentInstruction: string;
+    enabled: boolean[];
+  }[];
+  sections: { row: number; title: string; roles: string[] }[];
+}

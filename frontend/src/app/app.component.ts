@@ -14,6 +14,7 @@ import { TankCalculationService } from './services/tank-calculation.service';
 import { PrintJobPlannerService } from './services/print-job-planner.service';
 import { FileDownloadService } from './services/file-download.service';
 import { checklistTemplateLabel } from './core/checklist-template-label.util';
+import { allTrailers, normalizeRegNr } from './core/vehicle-registry.util';
 
 import {
   Driver,
@@ -78,9 +79,13 @@ export class AppComponent implements OnInit {
 
   /** Vilken genererad checklista som redigeras i modalen just nu (null = stängd). */
   editingChecklist: GeneratedChecklist | null = null;
+  editingJob: PrintJob | null = null;
+  editingRequest: GenerateChecklistRequest | null = null;
+  drafts = new Map<string, { request: GenerateChecklistRequest; baseline: string }>();
   isSavingEdit = false;
 
   readonly checklistTemplateLabel = checklistTemplateLabel;
+  readonly trackPrintJob = (_index: number, job: PrintJob): string => `${job.template}_${job.station}`;
 
   constructor(
     private readonly api: ApiService,
@@ -136,9 +141,15 @@ export class AppComponent implements OnInit {
 
   /** Bygger begäran för en given grupp av produkter utifrån aktuell formulärstate. */
   private buildRequest(job: PrintJob, tankSlots: TankSlot[]): GenerateChecklistRequest {
+    const knownTrailers = allTrailers(this.trucks);
+    const trailerUnit = (regNr: string) => {
+      const match = knownTrailers.find(t => normalizeRegNr(t.regNr) === normalizeRegNr(regNr));
+      return { regNr, isNew: !match, approvalExpiry: match?.approvalExpiry };
+    };
+    const truck = this.trucks.find(t => normalizeRegNr(t.regNr) === normalizeRegNr(this.selectedTruckReg));
     const trailers = [
-      ...(this.selectedTrailer1Reg ? [{ regNr: this.selectedTrailer1Reg, isNew: this.isNewTrailer1 }] : []),
-      ...(this.selectedTrailer2Reg ? [{ regNr: this.selectedTrailer2Reg, isNew: this.isNewTrailer2 }] : []),
+      ...(this.selectedTrailer1Reg ? [trailerUnit(this.selectedTrailer1Reg)] : []),
+      ...(this.selectedTrailer2Reg ? [trailerUnit(this.selectedTrailer2Reg)] : []),
     ];
 
     return {
@@ -148,7 +159,7 @@ export class AppComponent implements OnInit {
       driverAdrExpiry: this.driverAdrExpiry,
       isNewDriver: this.isNewDriver,
       akeri: this.akeri,
-      truck: { regNr: this.selectedTruckReg, isNew: this.isNewTruck },
+      truck: { regNr: this.selectedTruckReg, isNew: !!this.selectedTruckReg && !truck, approvalExpiry: truck?.approvalExpiry },
       trailers,
       tankSlots: tankSlots.map((s) => ({
         tankCode: s.tankCode,
@@ -179,6 +190,13 @@ export class AppComponent implements OnInit {
     }
 
     const tankSlots = this.calculateTankSlots();
+    if (printJobs.some(job => {
+      const draft = this.drafts.get(`${job.template}_${job.station}`);
+      return draft && draft.baseline !== JSON.stringify(this.buildRequest(job, tankSlots));
+    })) {
+      this.errorMessage = 'Underlaget har ändrats efter redigeringen. Öppna och spara utkastet igen innan generering.';
+      return;
+    }
     this.isGenerating = true;
     let pending = printJobs.length;
 
@@ -193,8 +211,8 @@ export class AppComponent implements OnInit {
     };
 
     printJobs.forEach((job) => {
-      const request = this.buildRequest(job, tankSlots);
       const key = `${job.template}_${job.station}`;
+      const request = this.drafts.get(key)?.request ?? this.buildRequest(job, tankSlots);
 
       this.api.generateChecklist(request).subscribe({
         next: (blob) => {
@@ -204,7 +222,7 @@ export class AppComponent implements OnInit {
             request,
             blob,
             fileName: this.buildFileName(request, job.station),
-            wasEdited: false,
+            wasEdited: this.drafts.has(key),
           };
           const existingIndex = this.generatedChecklists.findIndex((c) => c.key === key);
           if (existingIndex >= 0) {
@@ -224,15 +242,60 @@ export class AppComponent implements OnInit {
 
   /** Öppnar redigeringsmodalen (ingen ny flik) för en redan genererad checklista. */
   openEdit(entry: GeneratedChecklist): void {
+    this.errorMessage = null;
     this.editingChecklist = entry;
+    this.editingJob = null;
+    this.editingRequest = entry.request;
+  }
+
+  openDraft(job: PrintJob): void {
+    this.errorMessage = null;
+    const request = this.buildRequest(job, this.calculateTankSlots());
+    const draft = this.drafts.get(`${job.template}_${job.station}`);
+    this.editingChecklist = null;
+    this.editingJob = job;
+    this.editingRequest = draft?.baseline === JSON.stringify(request)
+      ? draft.request : { ...request, firstPage: draft?.request.firstPage };
+    if (draft && draft.baseline !== JSON.stringify(request)) {
+      this.errorMessage = 'Utkastets transportuppgifter har uppdaterats från underlaget. Kontrollkryss och kommentarer är bevarade.';
+    }
   }
 
   closeEdit(): void {
+    if (this.isSavingEdit) return;
     this.editingChecklist = null;
+    this.editingJob = null;
+    this.editingRequest = null;
   }
 
   /** Skickar det redigerade formuläret till backend igen och ersätter den lagrade filen. */
   onEditSave(editedRequest: GenerateChecklistRequest): void {
+    const matchingProducts = this.products.filter(p => editedRequest.selectedProducts.some(s =>
+      s.name === p.displayName && s.family === p.family));
+    const jobs = this.printJobPlanner.getPrintJobs(matchingProducts.map(p => ({ ...p, selected: true })));
+    if (jobs.length !== 1) {
+      this.errorMessage = 'En checklista måste innehålla produkter från samma station och mall.';
+      return;
+    }
+    const updatedJob = jobs[0];
+    if (this.editingJob) {
+      const oldJob = this.editingJob;
+      for (const product of this.products) {
+        if (oldJob.products.includes(product)) product.selected = false;
+        if (matchingProducts.includes(product)) product.selected = true;
+      }
+      this.drafts.delete(`${oldJob.template}_${oldJob.station}`);
+      const key = `${updatedJob.template}_${updatedJob.station}`;
+      const job = this.getPrintJobs().find(j => `${j.template}_${j.station}` === key)!;
+      editedRequest.selectedProducts = job.products.map(p => ({ name: p.displayName, family: p.family, unNumber: p.unNumber }));
+      this.drafts.set(key, {
+        request: editedRequest,
+        baseline: JSON.stringify(this.buildRequest(job, this.calculateTankSlots())),
+      });
+      this.closeEdit();
+      this.errorMessage = null;
+      return;
+    }
     const entry = this.editingChecklist;
     if (!entry) {
       return;
@@ -242,11 +305,13 @@ export class AppComponent implements OnInit {
     this.api.generateChecklist(editedRequest).subscribe({
       next: (blob) => {
         entry.request = editedRequest;
+        entry.printJob = updatedJob;
+        entry.key = `${updatedJob.template}_${updatedJob.station}`;
         entry.blob = blob;
         entry.fileName = this.buildFileName(editedRequest, entry.printJob.station);
         entry.wasEdited = true;
         this.isSavingEdit = false;
-        this.editingChecklist = null;
+        this.closeEdit();
       },
       error: () => {
         this.errorMessage = `Kunde inte uppdatera checklistan för station ${entry.printJob.station}.`;
@@ -261,7 +326,6 @@ export class AppComponent implements OnInit {
   }
 
   private get currentTrailers() {
-    const truck = this.trucks.find((t) => t.regNr === this.selectedTruckReg);
-    return truck ? truck.trailers : [];
+    return allTrailers(this.trucks);
   }
 }

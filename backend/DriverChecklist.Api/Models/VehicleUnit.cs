@@ -5,4 +5,4 @@ namespace DriverChecklist.Api.Models;
 /// </summary>
 /// <param name="RegNr">Registreringsnummer.</param>
 /// <param name="IsNew">True om enheten matats in manuellt och inte finns i master-Excelen.</param>
-public record VehicleUnit(string RegNr, bool IsNew);
+public record VehicleUnit(string RegNr, bool IsNew, string? ApprovalExpiry = null);

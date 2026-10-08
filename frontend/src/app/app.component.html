@@ -69,6 +69,18 @@
         </button>
       </div>
 
+      <div class="generated-list" *ngIf="getPrintJobs().length > 0">
+        <h4>Granska före generering</h4>
+        <div class="generated-item" *ngFor="let job of getPrintJobs(); trackBy: trackPrintJob">
+          <div class="generated-item-info">
+            <strong>{{ job.station }}</strong>
+            <span>{{ checklistTemplateLabel(job.template) }}</span>
+            <span *ngIf="drafts.has(job.template + '_' + job.station)" class="badge info">Sparat utkast</span>
+          </div>
+          <button class="btn secondary small" [disabled]="isGenerating" (click)="openDraft(job)">Redigera första sidan</button>
+        </div>
+      </div>
+
       <div class="generated-list" *ngIf="generatedChecklists.length > 0">
         <h4>Genererade checklistor</h4>
         <div class="generated-item" *ngFor="let entry of generatedChecklists">
@@ -88,9 +100,13 @@
 </div>
 
 <app-checklist-edit-modal
-  [isOpen]="editingChecklist !== null"
+  [isOpen]="editingRequest !== null"
   [isSaving]="isSavingEdit"
-  [request]="editingChecklist?.request ?? null"
+  [saveError]="errorMessage"
+  [request]="editingRequest"
+  [isDraft]="editingJob !== null"
+  [products]="products"
+  [trucks]="trucks"
   [operators]="operators"
   (save)="onEditSave($event)"
   (close)="closeEdit()"
