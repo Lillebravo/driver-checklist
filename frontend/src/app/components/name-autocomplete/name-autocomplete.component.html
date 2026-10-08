@@ -1,0 +1,12 @@
+<label [for]="inputId">{{ label }}</label>
+<input
+  [id]="inputId"
+  type="text"
+  [ngModel]="value"
+  (ngModelChange)="onInput($event)"
+  [attr.list]="inputId + '-list'"
+  [placeholder]="placeholder"
+/>
+<datalist [id]="inputId + '-list'">
+  <option *ngFor="let o of options" [value]="o"></option>
+</datalist>

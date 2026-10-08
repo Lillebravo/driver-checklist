@@ -17,5 +17,6 @@ public record GenerateChecklistRequest(
     VehicleUnit Truck,
     List<VehicleUnit> Trailers,
     List<TankSlot> TankSlots,
-    List<ProductItem> SelectedProducts
+    List<ProductItem> SelectedProducts,
+    AssistType AssistType
 );

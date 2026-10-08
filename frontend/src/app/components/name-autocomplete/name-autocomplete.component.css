@@ -1,0 +1,6 @@
+/* display: contents gör att komponenten inte skapar en egen box i DOM-trädet,
+   så att label/input ärver exakt samma flex/grid-styling som om de låg direkt
+   i den omgivande behållaren (t.ex. .operator-box). */
+:host {
+  display: contents;
+}

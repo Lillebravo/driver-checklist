@@ -1,16 +1,12 @@
 <h3>1. Chaufför</h3>
-<label for="driverName">Sök eller skriv namn:</label>
-<input
-  id="driverName"
-  type="text"
-  [ngModel]="driverName"
-  (ngModelChange)="onNameInput($event)"
-  list="driverList"
+<app-name-autocomplete
+  inputId="driverName"
+  label="Sök eller skriv namn:"
   placeholder="T.ex. Tony Blaffert"
-/>
-<datalist id="driverList">
-  <option *ngFor="let d of drivers" [value]="d.name"></option>
-</datalist>
+  [options]="driverNames"
+  [value]="driverName"
+  (valueChange)="onNameInput($event)"
+></app-name-autocomplete>
 
 <div class="field-row">
   <label for="adrExpiry">ADR Giltigt till:</label>

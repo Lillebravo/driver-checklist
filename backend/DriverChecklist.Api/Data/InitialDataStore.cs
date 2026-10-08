@@ -13,6 +13,7 @@ public static class InitialDataStore
 {
     public static InitDataResponse GetData() => new(
         DefaultOperator: "Vakt",
+        Operators: new List<string> { "Jerry", "Joel", "André" },
         Drivers: new List<DriverInfo>
         {
             new("Tony Blaffert", "2027-02-01"),

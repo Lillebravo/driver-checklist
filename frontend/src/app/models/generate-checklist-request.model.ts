@@ -1,4 +1,5 @@
 import { ChecklistTemplate } from './checklist-template.enum';
+import { AssistType } from './assist-type.enum';
 
 /** En fordonsenhet (dragbil eller släp) som skickas till backend. */
 export interface VehicleUnitRequest {
@@ -6,10 +7,11 @@ export interface VehicleUnitRequest {
   isNew: boolean;
 }
 
-/** En vald produkt (namn + UN-nummer) för en specifik checklista. */
+/** En vald produkt (namn, UN-nummer och produktfamilj) för en specifik checklista. */
 export interface ProductItemRequest {
   name: string;
   unNumber: string;
+  family: string;
 }
 
 /** En tankplats i det format backend förväntar sig (se `GenerateChecklistRequest`). */
@@ -33,4 +35,6 @@ export interface GenerateChecklistRequest {
   trailers: VehicleUnitRequest[];
   tankSlots: TankSlotRequest[];
   selectedProducts: ProductItemRequest[];
+  assistType: AssistType;
 }
+

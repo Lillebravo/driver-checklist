@@ -1,4 +1,5 @@
 export * from './checklist-template.enum';
+export * from './assist-type.enum';
 export * from './driver.model';
 export * from './vehicle.model';
 export * from './product.model';

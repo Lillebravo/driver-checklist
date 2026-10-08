@@ -6,6 +6,7 @@ namespace DriverChecklist.Api.Models.MasterData;
 /// </summary>
 public record InitDataResponse(
     string DefaultOperator,
+    List<string> Operators,
     List<DriverInfo> Drivers,
     List<TruckInfo> Trucks,
     List<ProductDefinition> Products

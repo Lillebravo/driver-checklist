@@ -7,6 +7,7 @@ import { VehicleSelectComponent } from './components/vehicle-select/vehicle-sele
 import { ProductSelectComponent } from './components/product-select/product-select.component';
 import { TankPreviewComponent } from './components/tank-preview/tank-preview.component';
 import { ChecklistEditModalComponent } from './components/checklist-edit-modal/checklist-edit-modal.component';
+import { NameAutocompleteComponent } from './components/name-autocomplete/name-autocomplete.component';
 
 import { ApiService } from './services/api.service';
 import { TankCalculationService } from './services/tank-calculation.service';
@@ -22,6 +23,7 @@ import {
   PrintJob,
   GenerateChecklistRequest,
   GeneratedChecklist,
+  AssistType,
 } from './models';
 
 /**
@@ -41,6 +43,7 @@ import {
     ProductSelectComponent,
     TankPreviewComponent,
     ChecklistEditModalComponent,
+    NameAutocompleteComponent,
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css',
@@ -49,6 +52,7 @@ export class AppComponent implements OnInit {
   operatorName = 'Vakt';
   akeri = '';
 
+  operators: string[] = [];
   drivers: Driver[] = [];
   trucks: Truck[] = [];
   products: ProductDefinition[] = [];
@@ -89,6 +93,7 @@ export class AppComponent implements OnInit {
     this.api.getInitData().subscribe({
       next: (data) => {
         this.operatorName = data.defaultOperator;
+        this.operators = data.operators;
         this.drivers = data.drivers;
         this.trucks = data.trucks;
         this.products = data.products;
@@ -147,7 +152,11 @@ export class AppComponent implements OnInit {
         expiryFormatted: s.expiryFormatted,
         isExpired: s.isExpired,
       })),
-      selectedProducts: job.products.map((p) => ({ name: p.displayName, unNumber: p.unNumber })),
+      selectedProducts: job.products.map((p) => ({ name: p.displayName, unNumber: p.unNumber, family: p.family })),
+      // Kända/förkonfigurerade chaufförer i masterdatan är redan godkända
+      // självlastare - kryssa i "Själv lastn" automatiskt för dem. För en ny/
+      // manuellt inmatad chaufför vet vi inget om detta, så inget kryssas i.
+      assistType: this.isNewDriver ? AssistType.Unspecified : AssistType.SelfLoading,
     };
   }
 

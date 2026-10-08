@@ -1,7 +1,8 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { GenerateChecklistRequest } from '../../models';
+import { GenerateChecklistRequest, AssistType } from '../../models';
+import { assistTypeLabel } from '../../core/assist-type-label.util';
 
 /**
  * Modal (inget nytt webbläsarfönster/ny flik) för att rätta till enstaka
@@ -27,6 +28,7 @@ import { GenerateChecklistRequest } from '../../models';
 export class ChecklistEditModalComponent {
   @Input() isOpen = false;
   @Input() isSaving = false;
+  @Input() operators: string[] = [];
 
   @Input() set request(value: GenerateChecklistRequest | null) {
     if (value) {
@@ -40,6 +42,14 @@ export class ChecklistEditModalComponent {
   @Output() close = new EventEmitter<void>();
 
   model: GenerateChecklistRequest | null = null;
+
+  readonly assistTypeLabel = assistTypeLabel;
+  readonly assistTypeOptions = [
+    AssistType.Unspecified,
+    AssistType.FullAssist,
+    AssistType.HalfAssist,
+    AssistType.SelfLoading,
+  ];
 
   onSave(): void {
     if (this.model) {

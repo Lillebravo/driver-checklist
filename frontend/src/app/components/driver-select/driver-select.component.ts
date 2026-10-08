@@ -2,6 +2,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Driver } from '../../models';
+import { NameAutocompleteComponent } from '../name-autocomplete/name-autocomplete.component';
 
 /**
  * Steg 1: Sök/välj chaufför. Visar ADR-utgångsdatum direkt och flaggar
@@ -10,12 +11,16 @@ import { Driver } from '../../models';
 @Component({
   selector: 'app-driver-select',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, NameAutocompleteComponent],
   templateUrl: './driver-select.component.html',
   styleUrl: './driver-select.component.css',
 })
 export class DriverSelectComponent {
   @Input() drivers: Driver[] = [];
+
+  get driverNames(): string[] {
+    return this.drivers.map((d) => d.name);
+  }
 
   @Input() driverName = '';
   @Output() driverNameChange = new EventEmitter<string>();

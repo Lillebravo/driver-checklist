@@ -6,8 +6,14 @@
       <input id="akeri" type="text" [(ngModel)]="akeri" placeholder="Åkerinamn" />
     </div>
     <div class="operator-box">
-      <label for="operatorName">Operatör / Vakt:</label>
-      <input id="operatorName" type="text" [(ngModel)]="operatorName" placeholder="Namn på vakt" />
+      <app-name-autocomplete
+        inputId="operatorName"
+        label="Operatör / Vakt:"
+        placeholder="T.ex. Jerry"
+        [options]="operators"
+        [value]="operatorName"
+        (valueChange)="operatorName = $event"
+      ></app-name-autocomplete>
     </div>
   </header>
 
@@ -85,6 +91,7 @@
   [isOpen]="editingChecklist !== null"
   [isSaving]="isSavingEdit"
   [request]="editingChecklist?.request ?? null"
+  [operators]="operators"
   (save)="onEditSave($event)"
   (close)="closeEdit()"
 ></app-checklist-edit-modal>

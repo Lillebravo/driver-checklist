@@ -22,6 +22,12 @@
           <input type="checkbox" [(ngModel)]="m.isNewDriver" />
           Ny Chaufför
         </label>
+        <label>
+          Lastningsassistans
+          <select [(ngModel)]="m.assistType">
+            <option *ngFor="let a of assistTypeOptions" [ngValue]="a">{{ assistTypeLabel(a) }}</option>
+          </select>
+        </label>
       </section>
 
       <section class="form-section">
@@ -33,7 +39,10 @@
           </label>
           <label>
             Operatör / Vakt
-            <input type="text" [(ngModel)]="m.operatorName" />
+            <input type="text" [(ngModel)]="m.operatorName" list="operatorListEdit" />
+            <datalist id="operatorListEdit">
+              <option *ngFor="let o of operators" [value]="o"></option>
+            </datalist>
           </label>
         </div>
       </section>
