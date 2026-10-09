@@ -21,12 +21,12 @@ public static class ProductCatalog
         new("PIX_118", "PIX 118", "PIX", "UN 2582", "STATION_PIX", ChecklistTemplate.Type1_PixPaxSasBdp),
         new("PIX_311", "PIX 311", "PIX", "UN 2582", "STATION_PIX", ChecklistTemplate.Type1_PixPaxSasBdp),
 
-        new("PAX_15", "PAX 15", "PAX", "UN 1760", "STATION_PAX_BDP", ChecklistTemplate.Type1_PixPaxSasBdp),
-        new("PAX_60", "PAX 60", "PAX", "UN 1760", "STATION_PAX_BDP", ChecklistTemplate.Type1_PixPaxSasBdp),
-        new("PAX_100", "PAX 100", "PAX", "UN 1760", "STATION_PAX_BDP", ChecklistTemplate.Type1_PixPaxSasBdp),
+        new("PAX_15", "PAX 15", "PAX", "UN 1760", "STATION_PAX", ChecklistTemplate.Type1_PixPaxSasBdp),
+        new("PAX_60", "PAX 60", "PAX", "UN 1760", "STATION_PAX", ChecklistTemplate.Type1_PixPaxSasBdp),
+        new("PAX_100", "PAX 100", "PAX", "UN 1760", "STATION_PAX", ChecklistTemplate.Type1_PixPaxSasBdp),
 
-        new("BDP_865", "BDP 865", "BDP", "UN 1760", "STATION_PAX_BDP", ChecklistTemplate.Type1_PixPaxSasBdp),
-        new("BDP_870", "BDP 870", "BDP", "UN 1760", "STATION_PAX_BDP", ChecklistTemplate.Type1_PixPaxSasBdp),
+        new("BDP_865", "BDP 865", "BDP", "UN 1760", "STATION_BDP", ChecklistTemplate.Type1_PixPaxSasBdp),
+        new("BDP_870", "BDP 870", "BDP", "UN 1760", "STATION_BDP", ChecklistTemplate.Type1_PixPaxSasBdp),
 
         // Typ 2: SVS och AKD
         new("SVS_97", "Svavelsyra 94-97%", "SVS", "UN 1830", "STATION_SVS_97", ChecklistTemplate.Type2_SvsAkd),

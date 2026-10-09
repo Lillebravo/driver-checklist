@@ -38,22 +38,22 @@ Ett internt webbaserat verktyg för utlastning av kemikalier. Systemet slår upp
 | **Aluminiumsulfat (ALS)**| ALS | UN 3264 | `STATION_ALS` | **Typ 3** |
 | **Natronlut (LUT)** | Natronlut | UN 1824 | `STATION_LUT` | **Typ 3** |
 | **PIX** | PIX 111, 113, 118, 311 | UN 2582 / UN 3264 | `STATION_PIX` | **Typ 1** |
-| **PAX** | PAX 15, 60, 100 | UN 1760 / UN 3264 | `STATION_PAX_BDP` *(Gemensam)* | **Typ 1** |
-| **BDP** | BDP 865, 870 | UN 1760 / UN 3264 | `STATION_PAX_BDP` *(Gemensam)* | **Typ 1** |
+| **PAX** | PAX 15, 60, 100 | UN 1760 / UN 3264 | `STATION_PAX` | **Typ 1** |
+| **BDP** | BDP 865, 870 | UN 1760 / UN 3264 | `STATION_BDP` | **Typ 1** |
 
 > **Status i denna MVP:** Typ 1- och Typ 2-mallarna är kopplade till riktiga Excel-filer och fullt fungerande. Typ 3 (ALS/LUT) finns med i produktkatalogen och domänmodellen för att vara redo när en mallfil tas fram, men saknar ännu en fysisk mall (se [Services/TemplateResolver.cs](backend/DriverChecklist.Api/Services/TemplateResolver.cs)).
 
 ### 2.2 Utskrifts- och Grupperingsregler
 
 1. **Gemensamma utlastningar:**
-   * **PAX & BDP:** Delar utlastningsplats (`STATION_PAX_BDP`) och använder **Typ 1**. Dessa kan samsas på en gemensam checklista.
    * **SVS 98 % & SVS 37 %:** Delar utlastningsplats (`STATION_SVS_98_37`) och använder **Typ 2**. Lastar en bil både 98 % och 37 % SVS krävs endast **en** checklista för dessa.
 2. **Separata utlastningar:**
    * **SVS 94–97 %:** Har en egen station (`STATION_SVS_97`). Om en transport lastar både 97 % och 98 % genereras **två** separata checklistor av Typ 2.
    * **ALS & LUT:** Båda använder **Typ 3**, men har separata stationer (`STATION_ALS` respektive `STATION_LUT`) → kräver **två** separata checklistor av Typ 3.
    * **SAS & PIX:** Båda använder **Typ 1**, men har separata stationer (`STATION_SAS` respektive `STATION_PIX`) → kräver separata checklistor.
+   * **PAX & BDP:** Båda använder **Typ 1**, men har separata stationer (`STATION_PAX` respektive `STATION_BDP`) → kräver separata checklistor.
 3. **Interna varianter:**
-   * Olika produktnummer inom samma familj (t.ex. PIX 111 och PIX 113 eller PAX 15 och PAX 60) kräver inte separata checklistor sinsemellan då de delar station.
+   * Olika produktnummer inom samma familj (t.ex. PIX 111 och PIX 113, PAX 15 och PAX 60 eller BDP 865 och BDP 870) kräver inte separata checklistor sinsemellan då de delar station.
 4. **Formel för antal checklistor:**
 
    ```
