@@ -9,5 +9,8 @@ public record InitDataResponse(
     List<string> Operators,
     List<DriverInfo> Drivers,
     List<TruckInfo> Trucks,
-    List<ProductDefinition> Products
+    List<ProductDefinition> Products,
+    string? VehicleRegistrySource = null,
+    List<string>? ImportWarnings = null,
+    List<TrailerInfo>? Trailers = null
 );

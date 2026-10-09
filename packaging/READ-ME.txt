@@ -1,0 +1,66 @@
+DRIVER CHECKLIST - PORTABLE WINDOWS x64 TEST APP
+
+No installation of VS Code, Node.js or .NET is required.
+This is an unsigned application. Follow company IT policy; do not bypass
+security warnings or controls. Ask IT for approval if running it is blocked.
+
+1. Extract the entire ZIP to a local folder. Do not run it inside the ZIP.
+2. Ensure the downloaded register exists:
+   C:\Users\a6bn\Downloads\Regnummer.xlsx
+3. Double-click Start-DriverChecklist.cmd (or DriverChecklist.Api.exe).
+4. Your browser opens http://localhost:5080.
+   Keep the console window open while using the app. Stop with Ctrl+C.
+   If the browser does not open, open the address manually.
+
+The entire folder is required, not only the executable.
+Only one instance can use port 5080. Do not expose the application to the network.
+
+CONFIGURATION
+Edit portable.json with Notepad while the app is stopped.
+Backslashes in JSON paths must be doubled, for example:
+  "Path": "C:\\Users\\a6bn\\Downloads\\Regnummer.xlsx"
+Restart after changing settings. The register is read-only and is never
+written back. It is a downloaded snapshot, not a live SharePoint connection.
+Reload the browser after replacing the register with a newer copy.
+
+CHECKLIST TEMPLATES
+The Templates folder must contain:
+  Ny 1 Saltsyra , Pix, mm. Tankar MED skyddande beläggning.xlsx
+  Ny 2 Svavelsyra 94,97 och 98 Fennosize. Tankar UTAN skyddande beläggning.xlsx
+Templates.Path can also be an absolute Windows folder path.
+Type 3 (ALS/LUT) has no supplied template.
+
+TEST SCOPE
+The import reads vehicles, drivers, uniquely matched ADR dates and hauliers.
+Vehicle cells containing only a registration number are accepted; missing
+tank code and approval date remain blank, with a warning for manual review.
+Complete entries elsewhere for the same registration can fill missing fields.
+Multiple registrations in one trailer cell are imported individually.
+Link means trailer 1 and Trailer means trailer 2 when both appear.
+Trailer-only rows are available under other registered trailers.
+Invalid/partial dates and short years stay blank. Conflicting vehicle fields
+or container numbers stay blank with row-specific warnings; enter the current
+information manually. Unclear entries do not block the rest of the register.
+Missing/ambiguous ADR dates remain blank and show warnings. A clear date for
+the same full driver name on another row can resolve a missing date.
+Conflicting dates remain blank. Verify the selected truck and ADR card.
+Inspection dates/compartments are not imported. Review and fill in tank
+details using first-page editing before printing. Self-loading permission
+is not inferred from being listed in the register.
+Container annotations attached to a trailer automatically select its TC
+checkbox and fill the container number when that trailer is selected.
+Container inspection dates are separate from the trailer approval date.
+This is a functional test package, not a complete basis for real loading.
+
+TROUBLESHOOTING
+Startup error: read the console; close any other app instance using port 5080.
+Import error: check portable.json, the workbook path and the import warning.
+File locked: close Excel and reload the browser.
+If you only see demo data, check that you started the extracted portable
+package and did not clear MasterData.Path.
+
+PRIVACY
+Do not publish this folder/ZIP when it contains company templates or data.
+Keep Regnummer.xlsx outside the package. Transfer privately using an approved
+company channel. The app needs no external server to operate; the register
+and generated checklists stay on the local machine.

@@ -35,6 +35,8 @@ public class TemplateResolver : ITemplateResolver
         var folder = string.IsNullOrWhiteSpace(_options.Path)
             ? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
             : _options.Path;
+        if (!Path.IsPathFullyQualified(folder))
+            folder = Path.GetFullPath(folder, AppContext.BaseDirectory);
 
         return Path.Combine(folder, fileName);
     }

@@ -1,7 +1,7 @@
 import { Component, EventEmitter, Input, Output, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { GenerateChecklistRequest, AssistType, ChecklistPage, ChecklistPageResponse, ProductDefinition, Truck, VehicleUnitRequest } from '../../models';
+import { GenerateChecklistRequest, AssistType, ChecklistPage, ChecklistPageResponse, ProductDefinition, Truck, Trailer, VehicleUnitRequest } from '../../models';
 import { assistTypeLabel } from '../../core/assist-type-label.util';
 import { ApiService } from '../../services/api.service';
 import { allTrailers, normalizeRegNr } from '../../core/vehicle-registry.util';
@@ -22,6 +22,7 @@ export class ChecklistEditModalComponent implements OnDestroy {
   @Input() operators: string[] = [];
   @Input() products: ProductDefinition[] = [];
   @Input() trucks: Truck[] = [];
+  @Input() registeredTrailers: Trailer[] = [];
   @Input() isDraft = false;
 
   @Input() set request(value: GenerateChecklistRequest | null) {
@@ -194,7 +195,7 @@ export class ChecklistEditModalComponent implements OnDestroy {
   updateVehicleStatus(unit: VehicleUnitRequest, isTruck = false): void {
     if (!this.model) return;
     const truck = this.trucks.find(t => normalizeRegNr(t.regNr) === normalizeRegNr(this.model!.truck.regNr));
-    const trailers = allTrailers(this.trucks);
+    const trailers = allTrailers(this.trucks, this.registeredTrailers);
     const known = isTruck ? truck : trailers.find(t => normalizeRegNr(t.regNr) === normalizeRegNr(unit.regNr));
     unit.isNew = !!unit.regNr.trim() && !known;
     unit.approvalExpiry = known?.approvalExpiry ?? '';
@@ -208,7 +209,7 @@ export class ChecklistEditModalComponent implements OnDestroy {
     if (key !== this.vehicleKey) {
       this.vehicleKey = key;
       this.model.tankSlots = this.tanks.calculateTankSlots(this.model.truck.regNr, truck?.tankCode ?? '',
-        allTrailers(this.trucks), this.model.trailers[0]?.regNr ?? '', this.model.trailers[1]?.regNr ?? '')
+        allTrailers(this.trucks, this.registeredTrailers), this.model.trailers[0]?.regNr ?? '', this.model.trailers[1]?.regNr ?? '')
         .map(s => ({ ...s }));
       this.padTanks();
     }

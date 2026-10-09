@@ -2,4 +2,6 @@
 export interface Driver {
   name: string;
   adrExpiry: string;
+  haulier?: string | null;
+  truckRegNrs?: string[] | null;
 }

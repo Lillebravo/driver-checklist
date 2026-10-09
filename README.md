@@ -162,10 +162,38 @@ driver-checklist/
 
 ## 7. Kom igång
 
+### Portabel Windows-app (utan VS Code, Node.js eller .NET på arbetsdatorn)
+
+Kör `packaging\Build-Portable.ps1` på utvecklingsdatorn med Node.js,
+projektets npm-beroenden och .NET SDK installerade:
+
+```powershell
+powershell -NoProfile -File .\packaging\Build-Portable.ps1 -IncludeTemplates
+```
+
+Skriptet bygger frontend och publicerar backend self-contained för Windows x64.
+Det skapar en tidsstämplad mapp och ZIP under `artifacts` (ignoreras av Git).
+`-IncludeTemplates` inkluderar lokala checklistemallar; paketet måste då överföras
+privat, inte publiceras. Utan flaggan kopierar du mallarna manuellt till paketets
+`Templates`-mapp. Registerfilen ingår aldrig.
+
+Packa upp **hela** ZIP-filen på arbetsdatorn och dubbelklicka
+`Start-DriverChecklist.cmd` eller `DriverChecklist.Api.exe`. Appen öppnar
+`http://localhost:5080` och lyssnar enbart lokalt. Låt konsolfönstret vara öppet;
+stoppa med Ctrl+C. Ingen separat frontend-process eller installation behövs.
+Det är ett portabelt mappaket, inte en ensam flyttbar exe-fil.
+
+`portable.json` pekar initialt på `C:\Users\a6bn\Downloads\Regnummer.xlsx`.
+Ändra filen med Anteckningar om sökvägen skiljer sig (JSON kräver dubbla backslash)
+och starta om appen. Mallmappen `Templates` är relativ till exe-filens mapp.
+Första körningen packar upp native-bibliotek till användarens temporära .NET-mapp.
+Det är en osignerad testapp; följ företagets IT-policy och kringgå inte säkerhetskontroller.
+Paketets `READ-ME.txt` innehåller start-, konfigurations- och felsökningsanvisningar.
+
 ### Förutsättningar
 
 * [.NET 8 SDK](https://dotnet.microsoft.com/download)
-* [Node.js 20+](https://nodejs.org/) och Angular CLI (`npm install -g @angular/cli`)
+* [Node.js 22](https://nodejs.org/) (minst 22.0) med npm. Angular CLI används från projektet; ingen global installation behövs.
 * De två checklistemallarna (`.xlsx`) måste finnas på ditt Skrivbord med exakt dessa filnamn:
   * `Ny 1 Saltsyra , Pix, mm. Tankar MED skyddande beläggning.xlsx`
   * `Ny 2 Svavelsyra 94,97 och 98 Fennosize. Tankar UTAN skyddande beläggning.xlsx`
@@ -174,7 +202,7 @@ driver-checklist/
 
 ```powershell
 cd backend\DriverChecklist.Api
-dotnet run
+dotnet run --launch-profile http
 ```
 
 ### Starta frontend (http://localhost:4200)
@@ -187,6 +215,145 @@ npm start
 
 Öppna sedan `http://localhost:4200` i webbläsaren.
 
+### Test på arbetsdatorn med en nedladdad Regnummer.xlsx
+
+Frontend och backend körs på **samma arbetsdator** i två separata PowerShell-fönster.
+Ingen serverinstallation eller åtkomst från andra datorer behövs. Följ arbetsplatsens
+regler för installation av .NET SDK och Node.js; fråga IT om installation är blockerad.
+
+1. Kopiera den uppdaterade koden till arbetsdatorn, eller klona repot med Git:
+
+   ```powershell
+   git clone https://github.com/Lillebravo/driver-checklist.git
+   cd driver-checklist
+   ```
+
+   Kloningen innehåller bara publicerad kod: lokala ändringar måste först överföras
+   eller publiceras. Företagets Excel-register och checklistemallar ska **inte**
+   läggas i Git. En ZIP av koden fungerar också om Git saknas.
+
+2. Kontrollera verktygen med `dotnet --list-sdks`, `node --version` och `npm --version`.
+   .NET 8 SDK eller senare måste kunna bygga projektets `net8.0`; körning kräver även
+   .NET 8 / ASP.NET Core 8 runtime (ingår i .NET 8 SDK).
+
+3. Kontrollera den nedladdade filen:
+
+   ```powershell
+   Test-Path 'C:\Users\a6bn\Downloads\Regnummer.xlsx'
+   ```
+
+   Resultatet ska vara `True`. Detta är en lokal ögonblickskopia av SharePoint-filen,
+   inte en live-koppling. Ladda ner en ny kopia när du vill testa uppdaterade uppgifter.
+
+4. Starta backend från repots rot i det första fönstret:
+
+   ```powershell
+   $env:MasterData__Path = 'C:\Users\a6bn\Downloads\Regnummer.xlsx'
+   # Bara om checklistemallarna inte ligger på Windows Skrivbord:
+   # $env:Templates__Path = 'C:\Users\a6bn\Downloads\Checklistemallar'
+   dotnet run --project .\backend\DriverChecklist.Api --launch-profile http
+   ```
+
+   `Templates__Path` är en **mapp** med de två checklistemallarna ovan;
+   `MasterData__Path` är sökvägen till **registerfilen**. De är olika källor.
+   Miljövariablerna gäller bara detta PowerShell-fönster och måste anges igen nästa gång.
+
+5. Starta frontend från repots rot i det andra fönstret:
+
+   ```powershell
+   cd frontend
+   npm ci
+   npm start
+   ```
+
+   `npm ci` behövs första gången och efter ändringar i paket/låsfilen.
+   Frontend på `http://localhost:4200` proxyar `/api` till backend på `http://localhost:5000`.
+   Starta om `npm start` efter ändringar i proxykonfigurationen.
+   Låt båda fönstren vara öppna; stoppa med Ctrl+C.
+
+6. Öppna `http://localhost:4200`. Sidan ska visa **Fordonsregister: Regnummer.xlsx**.
+   Kontrollera att en bil och ett släp du känner igen finns i söklistorna och att
+   godkännandedatumen är rätt. För exemplet blir bil `MBP 94C`, tankkod `L4BN`,
+   godkänd till `2027-03-19`, och släp `RHA 067`, tankkod `L4BN`, godkänt till `2027-03-22`.
+   API-svaret kan kontrolleras separat:
+
+   ```powershell
+   $data = Invoke-RestMethod 'http://localhost:5000/api/init-data'
+   $data.vehicleRegistrySource
+   $data.trucks | Select-Object regNr, tankCode, approvalExpiry
+   ```
+
+**Importens omfattning:** `bil`, `Släp/Trailer`, `Chaufförer`, `ADR Kort Datum`
+och `Åkeri` läses. Kolumnnamnen
+matchas oberoende av stora/små bokstäver, blanksteg och radbrytningar, bland de första
+30 använda raderna på varje blad. Andra blad utan dessa rubriker ignoreras.
+Fordonsceller läses per identifierbart reg.nr, inte som ett enda fordon.
+Tankkod och datum kan stå i olika ordning; kolon, streck och rollanteckningar
+stöds. Flera släp i samma cell importeras var för sig med egna uppgifter.
+**Link betyder släp 1 och Trailer släp 2** när båda finns, oavsett textordning.
+Släp utan bilkoppling finns under övriga registrerade släp; ingen bil uppfinns.
+Tankkoder som `ADR`, `L4BN`, `L4BH`, `L4DH`, `LGBH`, `LGCH`, kombinationer
+och containerkoder som `T11` bevaras. Kommentarer ger varningar, inte lastningstillstånd.
+Fullständiga datum i ÅÅÅÅ-MM-DD eller DD-MM-ÅÅÅÅ stöds. Ogiltiga kalenderdatum,
+enbart år/månad och tvåsiffriga år lämnas tomma med varning; inget datum gissas.
+Enbart reg.nr (exempelvis `ABC 123`, `DN 21143` eller `XYZ789`) stöds också:
+tankkod och godkännandedatum lämnas tomma och en importvarning visas.
+Om samma reg.nr finns med kompletta uppgifter på en annan rad används dessa;
+en ofullständig rad raderar aldrig redan kända uppgifter.
+Fackbeskrivningar som `F.1&3 L4BN, F.2 L4BV(+)` bevaras som text;
+de tolkas ännu inte som tankfack. Ett tomt släpfält stöds.
+En avslutande containeranteckning som `Cont. HAAU 725001-0: L4BN`,
+`Cont Nr ...` eller `Contnr: ...` utan
+godkännandedatum stöds: det registrerade släpet importeras, och containern visas
+som importvarning för manuell tank-/besiktningskontroll. Vid val av släpet
+bockas TC automatiskt i och containernumret förifylls i motsvarande släpfält.
+Containeruppgifter rensas vid byte till ett annat släp utan containerkoppling.
+Containern registreras inte som släp och ärver inte släpets godkännandedatum.
+Bil/släp med samma reg.nr dedupliceras utan hänsyn till blanksteg eller skiftläge;
+återkommande rader lägger till bilens släpkopplingar. Motstridiga tankkoder/datum
+lämnas tomma med varning, inte ersätts godtyckligt med första/sista raden.
+Det gäller även olika containernummer för samma släp: ange aktuell container manuellt.
+Otydliga poster varnas med blad/rad utan att stoppa säkra poster.
+Enbart numeriska platshållare eller anteckningar utan reg.nr blir inte fordon.
+
+Chaufförsnamn i samma cell separeras med radbrytning, semikolon eller minst två
+blanksteg. Vanliga blanksteg inom ett namn bevaras. Om bladet saknar både
+`Chaufförer` och `ADR Kort Datum` importeras enbart fordon med en synlig varning.
+ADR-datum tolkas som dag-månad-år (`25-01-2029`) eller dag/månad/år (`12/11/2028`).
+Excel-celler med datumtyp stöds också.
+En etikett som `C:`, `LP:` eller `H.` matchas mot första bokstaven, fulla
+namninitialer eller en flerteckensprefixt som `Mi:` / `Ma:` i förnamnet.
+Datum används endast om etiketten matchar **exakt ett** namn på raden.
+Ett datum utan etikett stöds bara när raden har ett enda chaufförsnamn.
+Namn utan entydigt datum importeras med tomt ADR-datum och varning;
+datum gissas aldrig utifrån ordningen i cellen. Ett entydigt datum på en annan rad
+för samma namn kan fylla i det saknade datumet. Motstridiga datum för samma namn
+lämnas tomma. Åkeri förifylls endast om uppgiften är entydig för chauffören.
+Bilkopplingarna hämtas från respektive rad i stället för att välja första bilen i registret.
+Kontrollera den förvalda bilen när chauffören kör flera bilar.
+ADR-datum måste fyllas i före generering. Att finnas i registret betyder inte
+att chauffören är godkänd för självlastning; assistansval görs manuellt i Excel-läget.
+
+**Inte importerat ännu:** Material, UN-nummer, signaturer, provtryckning och
+stickprov/efterkontroll.
+Excel-läget använder inga demochaufförer, påhittade fack eller demobesiktningsdatum.
+Tankkoderna visas i fordonslistorna, men tank-/besiktningsrader fylls inte automatiskt:
+kontrollera och fyll i tankuppgifter via **Redigera första sidan** före utskrift.
+Manuellt angivna chaufförer markeras som nya enligt befintlig logik.
+Produkt- och operatörslistor är fortfarande programmets konfiguration.
+Detta är ett funktionstest av fordonsuppslag, inte ett komplett underlag för verklig utlastning.
+
+Filen öppnas endast för läsning och läses på nytt vid varje hämtning av masterdata
+(ladda om webbsidan efter att du bytt kopian). Om den är låst exklusivt av Excel,
+stäng Excel och försök igen. Vid läs-/formatfel visas ett fel; programmet faller
+**inte** tillbaka till demofordon. Backend-fönstret innehåller felinformationen.
+Utan `MasterData__Path` / `MasterData:Path` körs det gamla demoläget.
+
+SharePoint-länken är en webbredigeringslänk och kan inte användas som lokal filsökväg.
+Arbetsdatorns webbläsarinloggning är inte automatiskt backendens inloggning.
+Den nedladdade kopian behöver däremot ingen SharePoint-autentisering i programmet.
+Senare kan samma inställning peka på en OneDrive-synkad lokal fil.
+
 ### Köra tester
 
 ```powershell
@@ -194,6 +361,10 @@ npm start
 cd backend
 dotnet build
 dotnet run --project DriverChecklist.Tests -- ".\DriverChecklist.Api\Templates"
+# Bara fordonsimporten (skapar syntetiska Excel-filer, inga företagsfiler behövs)
+dotnet run --project DriverChecklist.Tests -- --registry-only
+# Kontrollera en verklig arbetsbok read-only; skriver antal och radvarningar.
+dotnet run --project DriverChecklist.Tests -- --registry-file "C:\Users\a6bn\Downloads\Regnummer.xlsx"
 
 # Frontend
 cd frontend
@@ -209,8 +380,8 @@ namnens placering, datumformat och att mallfilerna inte ändras.
 
 ## 8. Kända begränsningar & nästa steg (MVP)
 
-* Masterdata (chaufförer/fordon) är hårdkodad i `InitialDataStore.cs`. Ska bytas mot en tjänst som läser read-only från den delade Teams/OneDrive-Excelen (gränssnittet `IMasterDataService` finns redan på plats för detta).
+* Fordon, chaufförer, entydiga ADR-datum och åkeri kan läsas read-only från en lokal Excel-fil via `MasterData:Path` (se avsnitt 7). Utan sökväg används hårdkodad demodata i `InitialDataStore.cs`. Import av fack/besiktning återstår.
 * Checklistemallarna läses just nu från Skrivbordet. Ska pekas om till en synkad Teams/OneDrive-mapp via `Templates:Path` i `appsettings.json`.
 * Typ 3-mallen (ALS/LUT) saknar ännu en fysisk Excel-fil.
-* Dragbilens egna besiktnings-/trycktestdatum (Tank 1) är i dagsläget hårdkodade placeholder-värden i `TankCalculationService`, eftersom masterdatan för dragbilar ännu inte innehåller dessa fält.
+* Dragbilens egna besiktnings-/trycktestdatum (Tank 1) är placeholder-värden i demoläget. I Excel-läget används inga demobesiktningsdatum; tankuppgifter fylls i manuellt via första sidans redigering.
 * "Skriv ut"-knappen laddar ner Excel-filen - webbläsare kan inte skicka en `.xlsx`-fil direkt till en fysisk skrivare utan att öppna den i ett program som Excel. Om genuin ett-klicks-utskrift (utan att öppna Excel) behövs senare krävs en server-side konvertering till PDF (t.ex. via LibreOffice headless), vilket är ett medvetet val att inte göra i denna MVP.

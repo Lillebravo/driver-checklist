@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 
 import { DriverSelectComponent } from './components/driver-select/driver-select.component';
 import { VehicleSelectComponent } from './components/vehicle-select/vehicle-select.component';
@@ -19,6 +20,7 @@ import { allTrailers, normalizeRegNr } from './core/vehicle-registry.util';
 import {
   Driver,
   Truck,
+  Trailer,
   ProductDefinition,
   TankSlot,
   PrintJob,
@@ -56,7 +58,10 @@ export class AppComponent implements OnInit {
   operators: string[] = [];
   drivers: Driver[] = [];
   trucks: Truck[] = [];
+  registeredTrailers: Trailer[] = [];
   products: ProductDefinition[] = [];
+  vehicleRegistrySource: string | null = null;
+  importWarnings: string[] = [];
 
   selectedDriverName = '';
   driverAdrExpiry = '';
@@ -108,16 +113,39 @@ export class AppComponent implements OnInit {
         this.operators = data.operators;
         this.drivers = data.drivers;
         this.trucks = data.trucks;
+        this.registeredTrailers = data.trailers ?? [];
         this.products = data.products;
+        this.vehicleRegistrySource = data.vehicleRegistrySource ?? null;
+        this.importWarnings = data.importWarnings ?? [];
       },
-      error: () => {
-        this.errorMessage = 'Kunde inte hämta masterdata från servern. Är backend igång?';
+      error: (error: HttpErrorResponse) => {
+        const detail: unknown = error.error?.detail;
+        this.errorMessage = typeof detail === 'string'
+          ? `Kunde inte hämta masterdata. ${detail}`
+          : error.status >= 500
+          ? 'Servern kunde inte läsa masterdata. Kontrollera felmeddelandet i programmets konsolfönster.'
+          : 'Kunde inte hämta masterdata från servern. Är backend igång?';
       },
     });
   }
 
   onIsNewDriverChange(isNew: boolean): void {
     this.isNewDriver = isNew;
+    if (this.vehicleRegistrySource) {
+      const driver = this.drivers.find(d => d.name.toLowerCase() === this.selectedDriverName.toLowerCase());
+      if (!isNew && driver) {
+        this.akeri = driver.haulier ?? '';
+        const truck = this.trucks.find(t => driver.truckRegNrs?.some(reg => normalizeRegNr(reg) === normalizeRegNr(t.regNr)));
+        if (truck && !this.selectedTruckReg) {
+          this.selectedTruckReg = truck.regNr;
+          this.truckTankCode = truck.tankCode;
+          this.isNewTruck = false;
+        }
+      } else {
+        this.akeri = '';
+      }
+      return;
+    }
     if (!isNew) {
       this.akeri = 'PH Tank';
     } else if (this.akeri === 'PH Tank') {
@@ -133,6 +161,9 @@ export class AppComponent implements OnInit {
   }
 
   calculateTankSlots(): TankSlot[] {
+    if (this.vehicleRegistrySource) {
+      return [];
+    }
     return this.tankCalculation.calculateTankSlots(
       this.selectedTruckReg,
       this.truckTankCode,
@@ -148,7 +179,7 @@ export class AppComponent implements OnInit {
 
   /** Bygger begäran för en given grupp av produkter utifrån aktuell formulärstate. */
   private buildRequest(job: PrintJob, tankSlots: TankSlot[]): GenerateChecklistRequest {
-    const knownTrailers = allTrailers(this.trucks);
+    const knownTrailers = allTrailers(this.trucks, this.registeredTrailers);
     const trailerUnit = (regNr: string) => {
       const match = knownTrailers.find(t => normalizeRegNr(t.regNr) === normalizeRegNr(regNr));
       return { regNr, isNew: !match, approvalExpiry: match?.approvalExpiry };
@@ -179,7 +210,7 @@ export class AppComponent implements OnInit {
       // Kända/förkonfigurerade chaufförer i masterdatan är redan godkända
       // självlastare - kryssa i "Själv lastn" automatiskt för dem. För en ny/
       // manuellt inmatad chaufför vet vi inget om detta, så inget kryssas i.
-      assistType: this.isNewDriver ? AssistType.Unspecified : AssistType.SelfLoading,
+      assistType: this.isNewDriver || this.vehicleRegistrySource ? AssistType.Unspecified : AssistType.SelfLoading,
       ...(this.currentContainerNumber ? {
         firstPage: {
           timestamp: this.containerTimestamp,
@@ -198,6 +229,10 @@ export class AppComponent implements OnInit {
   /** Genererar en checklista per (mall, station) och lägger dem i listan nedan - laddar inte ner automatiskt. */
   generateChecklists(): void {
     this.errorMessage = null;
+    if (this.vehicleRegistrySource && (!this.selectedDriverName.trim() || !this.driverAdrExpiry)) {
+      this.errorMessage = 'Välj chaufför och kontrollera/fyll i ADR-datum före generering.';
+      return;
+    }
     const printJobs = this.getPrintJobs();
     if (printJobs.length === 0) {
       this.errorMessage = 'Välj minst en produkt att lasta!';
@@ -352,7 +387,7 @@ export class AppComponent implements OnInit {
   }
 
   private get currentTrailers() {
-    return allTrailers(this.trucks);
+    return allTrailers(this.trucks, this.registeredTrailers);
   }
 
   private get currentContainerNumber(): string {

@@ -11,6 +11,15 @@ using Microsoft.Extensions.Options;
 using Drawing = DocumentFormat.OpenXml.Drawing;
 using SpreadsheetDrawing = DocumentFormat.OpenXml.Drawing.Spreadsheet;
 
+if (args is ["--registry-file", var registryPath])
+{
+    VehicleRegistryTests.ValidateFile(registryPath);
+    return 0;
+}
+VehicleRegistryTests.Run();
+if (args is ["--registry-only"])
+    return 0;
+
 if (args.Length != 1 || !Directory.Exists(args[0]))
 {
     Console.Error.WriteLine("Usage: dotnet run --project DriverChecklist.Tests -- <template-directory>");

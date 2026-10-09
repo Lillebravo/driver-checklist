@@ -17,3 +17,9 @@ Thumbs.db
 
 # Checklistemallar (proprietära, ska inte committas)
 backend/DriverChecklist.Api/Templates/*.xlsx
+
+# Lokalt fordonsregister med företagsdata
+**/Regnummer.xlsx
+
+# Portable releases (may contain proprietary templates)
+artifacts/

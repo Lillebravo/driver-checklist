@@ -4,5 +4,8 @@ namespace DriverChecklist.Api.Models.MasterData;
 public record TrailerInfo(
     string RegNr,
     string ApprovalExpiry,
-    List<CompartmentInfo> Compartments
+    List<CompartmentInfo> Compartments,
+    string? TankCode = null,
+    string? ContainerNumber = null,
+    string? ContainerTankCode = null
 );

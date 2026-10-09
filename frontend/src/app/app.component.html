@@ -18,6 +18,17 @@
   </header>
 
   <div *ngIf="errorMessage" class="error-banner">{{ errorMessage }}</div>
+  <section *ngIf="vehicleRegistrySource" class="card" role="status">
+    <strong>Fordonsregister: {{ vehicleRegistrySource }} (lokal kopia, skrivskyddad läsning)</strong>
+    <p>Fordon, chaufförer, entydiga ADR-datum och åkeri läses från Excel. Saknade eller osäkra ADR-datum lämnas tomma.
+      Besiktningsdatum och fackuppgifter importeras inte ännu. Kontrollera och fyll i tankuppgifter via
+      Redigera första sidan före utskrift. Demodata för chaufförer och tankbesiktning används inte.
+      Självlastning måste väljas manuellt; ett namn i registret är inte ett självlastningstillstånd.</p>
+    <details *ngIf="importWarnings.length">
+      <summary>Importvarningar ({{ importWarnings.length }}) - kontrollera före utskrift</summary>
+      <ul><li *ngFor="let warning of importWarnings">{{ warning }}</li></ul>
+    </details>
+  </section>
 
   <main class="grid-layout">
     <section class="card">
@@ -35,6 +46,7 @@
     <section class="card">
       <app-vehicle-select
         [trucks]="trucks"
+        [registeredTrailers]="registeredTrailers"
         [truckRegNr]="selectedTruckReg"
         (truckRegNrChange)="selectedTruckReg = $event"
         [truckTankCode]="truckTankCode"
@@ -113,6 +125,7 @@
   [isDraft]="editingJob !== null"
   [products]="products"
   [trucks]="trucks"
+  [registeredTrailers]="registeredTrailers"
   [operators]="operators"
   (save)="onEditSave($event)"
   (close)="closeEdit()"

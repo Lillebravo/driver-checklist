@@ -23,7 +23,7 @@
     </div>
   </div>
   <datalist id="truckList">
-    <option *ngFor="let t of trucks" [value]="t.regNr"></option>
+    <option *ngFor="let t of trucks" [value]="t.regNr">{{ t.tankCode }} - Godkänd: {{ t.approvalExpiry || 'Datum saknas' }}</option>
   </datalist>
   <div *ngIf="isNewTruck" class="badge warning">Ny Dragbil</div>
 </div>
@@ -105,7 +105,8 @@
         [attr.aria-selected]="isActiveSuggestion(trailer.regNr)"
         [class.active]="isActiveSuggestion(trailer.regNr)"
         (mousedown)="$event.preventDefault()" (click)="selectTrailer(slot, trailer.regNr)">
-        {{ trailer.regNr }} <small>Godkänd: {{ trailer.approvalExpiry }}</small>
+        {{ trailer.regNr }} <small>{{ trailer.tankCode }} Godkänd: {{ trailer.approvalExpiry || 'Datum saknas' }}</small>
+        <small *ngIf="trailer.containerNumber">TC {{ trailer.containerNumber }} ({{ trailer.containerTankCode }})</small>
       </button>
     </div>
   </div>

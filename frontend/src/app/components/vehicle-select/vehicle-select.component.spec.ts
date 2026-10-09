@@ -43,6 +43,24 @@ describe('Vehicle registry', () => {
     expect(component.trailerGroups[1].trailers[0].regNr).toBe('TWO 456');
   });
 
+  it('lists and selects trailers without a truck association in either slot', () => {
+    const component = new VehicleSelectComponent();
+    component.trucks = trucks;
+    component.registeredTrailers = [{
+      regNr: 'SOLO 123', approvalExpiry: '', compartments: [], containerNumber: 'TEST123456-7',
+    }];
+    component.activeTrailer = 1;
+    expect(component.trailerGroups[1].trailers.some(t => t.regNr === 'SOLO 123')).toBeTrue();
+    const new1 = spyOn(component.isNewTrailer1Change, 'emit');
+    const new2 = spyOn(component.isNewTrailer2Change, 'emit');
+    component.onTrailer1Input('solo123');
+    component.onTrailer2Input('SOLO 123');
+    expect(new1).toHaveBeenCalledWith(false);
+    expect(new2).toHaveBeenCalledWith(false);
+    expect(component.trailer1ContainerNumber).toBe('TEST123456-7');
+    expect(component.trailer2ContainerNumber).toBe('TEST123456-7');
+  });
+
   it('independently toggles and emits container numbers beside all three registration fields', async () => {
     const fixture = TestBed.createComponent(VehicleSelectComponent);
     fixture.detectChanges();
@@ -84,5 +102,34 @@ describe('Vehicle registry', () => {
     expect(slots.length).toBe(2);
     expect(slots[1].tankCode).toBe('L4BH');
     expect(slots[1].lastInspectionMonthYear).toBe('2026-06');
+  });
+
+  it('automatically selects TC and container number for either trailer and clears stale data on change', () => {
+    const component = new VehicleSelectComponent();
+    component.trucks = [{
+      regNr: 'ABC123', tankCode: 'ADR', approvalExpiry: '2027-01-01', trailers: [
+        { regNr: 'XYZ 789', approvalExpiry: '2027-09-01', compartments: [],
+          containerNumber: 'TEST725001-0', containerTankCode: 'L4BN' },
+        { regNr: 'UVW 123', approvalExpiry: '2027-09-01', compartments: [] },
+      ],
+    }];
+    const toggle1 = spyOn(component.trailer1IsTankContainerChange, 'emit');
+    const number1 = spyOn(component.trailer1ContainerNumberChange, 'emit');
+    const toggle2 = spyOn(component.trailer2IsTankContainerChange, 'emit');
+    const number2 = spyOn(component.trailer2ContainerNumberChange, 'emit');
+    component.onTrailer1Input('xyz789');
+    expect(toggle1).toHaveBeenCalledWith(true);
+    expect(number1).toHaveBeenCalledWith('TEST725001-0');
+    expect(component.trailer1IsTankContainer).toBeTrue();
+    component.onTrailer2Input('XYZ 789');
+    expect(toggle2).toHaveBeenCalledWith(true);
+    expect(number2).toHaveBeenCalledWith('TEST725001-0');
+    component.onTrailer1Input('UVW123');
+    expect(toggle1).toHaveBeenCalledWith(false);
+    expect(number1).toHaveBeenCalledWith('');
+    expect(component.trailer2ContainerNumber).toBe('TEST725001-0');
+    component.onTrailer2Input('');
+    expect(toggle2).toHaveBeenCalledWith(false);
+    expect(number2).toHaveBeenCalledWith('');
   });
 });

@@ -39,6 +39,90 @@ describe('AppComponent', () => {
     expect(app.akeri).toBe('PH Tank');
   });
 
+  it('identifies an Excel source and does not calculate demo inspection data', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne(r => r.url.endsWith('/init-data')).flush({
+      defaultOperator: 'Vakt', operators: [], drivers: [], products: [],
+      trucks: [{ regNr: 'MBP 94C', tankCode: 'L4BN', approvalExpiry: '2027-03-19', trailers: [] }],
+      vehicleRegistrySource: 'Regnummer.xlsx',
+    });
+    fixture.detectChanges();
+    const app = fixture.componentInstance;
+    expect(app.trucks[0].regNr).toBe('MBP 94C');
+    expect(app.drivers).toEqual([]);
+    expect(app.calculateTankSlots()).toEqual([]);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[role="status"]')?.textContent)
+      .toContain('Regnummer.xlsx');
+    http.verify();
+  });
+
+  it('shows the Excel import error returned by the backend', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne(r => r.url.endsWith('/init-data')).flush(
+      { detail: 'Blad Vehicles, rad 4: ogiltigt giltighetsdatum.' },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+    expect(fixture.componentInstance.errorMessage).toContain('rad 4');
+    expect(fixture.componentInstance.trucks).toEqual([]);
+    http.verify();
+  });
+
+  it('does not describe an unexpected server error as a stopped backend', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne(r => r.url.endsWith('/init-data')).flush(
+      null, { status: 500, statusText: 'Internal Server Error' },
+    );
+    expect(fixture.componentInstance.errorMessage).toContain('konsolfönster');
+    expect(fixture.componentInstance.errorMessage).not.toContain('Är backend igång');
+    http.verify();
+  });
+
+  it('uses the imported driver carrier and truck association instead of PH Tank and the first truck', () => {
+    const app = TestBed.createComponent(AppComponent).componentInstance;
+    app.vehicleRegistrySource = 'Regnummer.xlsx';
+    app.selectedDriverName = 'Test Driver';
+    app.drivers = [{ name: 'Test Driver', adrExpiry: '2030-01-01', haulier: 'Carrier A', truckRegNrs: ['BBB123'] }];
+    app.trucks = [
+      { regNr: 'AAA123', tankCode: 'L4BH', approvalExpiry: '2027-01-01', trailers: [] },
+      { regNr: 'BBB 123', tankCode: 'ADR', approvalExpiry: '2028-01-01', trailers: [] },
+    ];
+    app.onIsNewDriverChange(false);
+    expect(app.akeri).toBe('Carrier A');
+    expect(app.selectedTruckReg).toBe('BBB 123');
+    expect(app.truckTankCode).toBe('ADR');
+    app.drivers[0].haulier = null;
+    app.onIsNewDriverChange(false);
+    expect(app.akeri).toBe('');
+  });
+
+  it('requires manual verification of a missing ADR date before Excel-mode generation', () => {
+    const app = TestBed.createComponent(AppComponent).componentInstance;
+    app.vehicleRegistrySource = 'Regnummer.xlsx';
+    app.selectedDriverName = 'Test Driver';
+    app.generateChecklists();
+    expect(app.errorMessage).toContain('ADR-datum');
+    TestBed.inject(HttpTestingController).expectNone(r => r.url.endsWith('/generate'));
+  });
+
+  it('does not infer self-loading authorization from an imported driver', () => {
+    const app = TestBed.createComponent(AppComponent).componentInstance;
+    app.vehicleRegistrySource = 'Regnummer.xlsx';
+    app.products = [{
+      code: 'PIX311', displayName: 'PIX 311', family: 'PIX', unNumber: 'UN 2582',
+      template: ChecklistTemplate.Type1_PixPaxSasBdp, loadingStationId: 'PIX', selected: true,
+    }];
+    app.selectedDriverName = 'Test Driver';
+    app.driverAdrExpiry = '2030-01-01';
+    app.openDraft(app.getPrintJobs()[0]);
+    expect(app.editingRequest!.assistType).toBe(0);
+  });
+
   it('should clear PH Tank when switching to an unknown driver', () => {
     const app = TestBed.createComponent(AppComponent).componentInstance;
     app.onIsNewDriverChange(false);

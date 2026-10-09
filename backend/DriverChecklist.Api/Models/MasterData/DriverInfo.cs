@@ -1,4 +1,8 @@
 namespace DriverChecklist.Api.Models.MasterData;
 
 /// <summary>En chaufför enligt master-Excelen, med ADR-utgångsdatum.</summary>
-public record DriverInfo(string Name, string AdrExpiry);
+public record DriverInfo(
+    string Name,
+    string AdrExpiry,
+    string? Haulier = null,
+    List<string>? TruckRegNrs = null);

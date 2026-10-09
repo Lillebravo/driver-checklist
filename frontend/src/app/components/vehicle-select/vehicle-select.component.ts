@@ -18,6 +18,7 @@ import { allTrailers, normalizeRegNr } from '../../core/vehicle-registry.util';
 })
 export class VehicleSelectComponent {
   @Input() trucks: Truck[] = [];
+  @Input() registeredTrailers: Trailer[] = [];
 
   @Input() truckRegNr = '';
   @Output() truckRegNrChange = new EventEmitter<string>();
@@ -66,7 +67,7 @@ export class VehicleSelectComponent {
     const filter = (items: Trailer[]) => items.filter(t => normalizeRegNr(t.regNr).includes(query));
     return [
       { label: 'Vanliga släp för bilen', trailers: filter(usual) },
-      { label: 'Övriga registrerade släp', trailers: filter(allTrailers(this.trucks).filter(t => !usualKeys.has(normalizeRegNr(t.regNr)))) },
+      { label: 'Övriga registrerade släp', trailers: filter(allTrailers(this.trucks, this.registeredTrailers).filter(t => !usualKeys.has(normalizeRegNr(t.regNr)))) },
     ];
   }
 
@@ -108,18 +109,38 @@ export class VehicleSelectComponent {
   }
 
   onTrailer1Input(value: string): void {
+    const changed = normalizeRegNr(this.trailer1Reg) !== normalizeRegNr(value);
     this.trailer1Reg = value;
     this.activeSuggestion = -1;
     this.trailer1RegChange.emit(value);
-    const isNew = !!value.trim() && !allTrailers(this.trucks).some((t) => normalizeRegNr(t.regNr) === normalizeRegNr(value));
+    const isNew = !!value.trim() && !allTrailers(this.trucks, this.registeredTrailers).some((t) => normalizeRegNr(t.regNr) === normalizeRegNr(value));
     this.isNewTrailer1Change.emit(isNew);
+    if (changed) this.applyTrailerContainer(1, value);
   }
 
   onTrailer2Input(value: string): void {
+    const changed = normalizeRegNr(this.trailer2Reg) !== normalizeRegNr(value);
     this.trailer2Reg = value;
     this.activeSuggestion = -1;
     this.trailer2RegChange.emit(value);
-    const isNew = !!value.trim() && !allTrailers(this.trucks).some((t) => normalizeRegNr(t.regNr) === normalizeRegNr(value));
+    const isNew = !!value.trim() && !allTrailers(this.trucks, this.registeredTrailers).some((t) => normalizeRegNr(t.regNr) === normalizeRegNr(value));
     this.isNewTrailer2Change.emit(isNew);
+    if (changed) this.applyTrailerContainer(2, value);
+  }
+
+  private applyTrailerContainer(slot: 1 | 2, regNr: string): void {
+    const trailer = allTrailers(this.trucks, this.registeredTrailers).find(t => normalizeRegNr(t.regNr) === normalizeRegNr(regNr));
+    const number = trailer?.containerNumber ?? '';
+    if (slot === 1) {
+      this.trailer1IsTankContainer = !!number;
+      this.trailer1ContainerNumber = number;
+      this.trailer1IsTankContainerChange.emit(!!number);
+      this.trailer1ContainerNumberChange.emit(number);
+    } else {
+      this.trailer2IsTankContainer = !!number;
+      this.trailer2ContainerNumber = number;
+      this.trailer2IsTankContainerChange.emit(!!number);
+      this.trailer2ContainerNumberChange.emit(number);
+    }
   }
 }

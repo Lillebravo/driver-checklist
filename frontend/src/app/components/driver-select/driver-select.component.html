@@ -19,3 +19,4 @@
 </div>
 
 <div *ngIf="isNewDriver" class="badge warning">Ny Chaufför (Manuell inmatning)</div>
+<div *ngIf="driverName && !adrExpiry" class="badge warning">ADR-datum saknas - kontrollera kortet och fyll i manuellt.</div>

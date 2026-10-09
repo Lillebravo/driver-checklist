@@ -4,9 +4,8 @@ namespace DriverChecklist.Api.Services;
 
 /// <summary>
 /// Abstraktion för att hämta masterdata (chaufförer, fordon, produkter).
-/// Gör det möjligt att senare byta ut <see cref="MasterDataService"/> mot en
-/// implementation som läser read-only direkt från den delade Teams/OneDrive-
-/// Excelen, utan att ändra något i Endpoints-lagret.
+/// MasterDataService läser en lokal eller synkad Excel-fil read-only när
+/// MasterData:Path är konfigurerad; annars används demodata.
 /// </summary>
 public interface IMasterDataService
 {

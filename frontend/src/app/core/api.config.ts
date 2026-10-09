@@ -1,6 +1,2 @@
-/**
- * Bas-URL till DriverChecklist.Api. I denna MVP är detta hårdkodat till
- * den lokala utvecklingsservern. Flytta till `environment.ts` när appen
- * ska driftsättas mot en riktig miljö.
- */
-export const API_BASE_URL = 'http://localhost:5000';
+/** Same-origin in the portable app; ng serve proxies /api during development. */
+export const API_BASE_URL = '';

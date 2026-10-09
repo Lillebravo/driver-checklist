@@ -41,6 +41,8 @@ export class DriverSelectComponent {
       this.adrExpiryChange.emit(match.adrExpiry);
       this.isNewDriverChange.emit(false);
     } else {
+      this.adrExpiry = '';
+      this.adrExpiryChange.emit('');
       this.isNewDriverChange.emit(true);
     }
   }

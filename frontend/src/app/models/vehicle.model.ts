@@ -10,6 +10,9 @@ export interface Compartment {
 /** Ett släp som en dragbil brukar köra med, inklusive dess fack. */
 export interface Trailer {
   regNr: string;
+  tankCode?: string | null;
+  containerNumber?: string | null;
+  containerTankCode?: string | null;
   approvalExpiry: string;
   compartments: Compartment[];
 }
