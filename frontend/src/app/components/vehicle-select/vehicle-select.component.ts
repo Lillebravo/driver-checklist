@@ -104,6 +104,7 @@ export class VehicleSelectComponent {
       this.truckTankCodeChange.emit(match.tankCode);
       this.isNewTruckChange.emit(false);
     } else {
+      this.truckTankCodeChange.emit('');
       this.isNewTruckChange.emit(!!value.trim());
     }
   }

@@ -40,7 +40,8 @@ internal static class VehicleCellReader
             text = text[..container.Index];
         }
 
-        var matches = Registrations.Matches(text).Cast<Match>()
+        var registrationText = Dates.Replace(text, match => new string(' ', match.Length));
+        var matches = Registrations.Matches(registrationText).Cast<Match>()
             .Where(match =>
             {
                 var value = Regex.Replace(match.Groups["reg"].Value, @"\s+", "");
@@ -81,16 +82,25 @@ internal static class VehicleCellReader
             else if (dateMatches.Count > 1)
                 warnings.Add($"{location}: flera datum för {registration}; datum lämnas tomt.");
             var codeMatches = Codes.Matches(details).Cast<Match>().ToList();
-            var tankCode = string.Join(" / ", codeMatches.Select(code => Regex.Replace(code.Value, @"\s+", "").ToUpperInvariant()).Distinct());
+            var tankCode = string.Join(" / ", codeMatches.Select(code => NormalizeCode(code.Value)).Distinct());
             if (codeMatches.Count > 0 && (codeMatches.Count > 1 || Regex.IsMatch(details, @"\bF(?:ack)?[.:]?\s*\d|\b[12]&3", RegexOptions.IgnoreCase)))
             {
-                var codeEnd = codeMatches.Last().Index + codeMatches.Last().Length;
-                var description = Regex.Replace(Dates.Replace(details[..codeEnd], ""), @"\(?\b(Link|Trailer|Tr|SL|Dolly)\b\)?\s*:?", "", RegexOptions.IgnoreCase)
+                var lastCode = codeMatches[^1];
+                var codeEnd = lastCode.Index + lastCode.Length;
+                var suffix = Regex.Match(details[codeEnd..],
+                    @"^\s*(?:VP\b|\bF(?:ack)?[.:\-]?\s*\d(?:\s*[&o-]\s*\d)*\b)*", RegexOptions.IgnoreCase);
+                var description = Regex.Replace(Dates.Replace(details[..(codeEnd + suffix.Length)], ""),
+                    @"\(?\b(Link|Trailer|Tr|SL|Dolly)\b\)?\s*:?", "", RegexOptions.IgnoreCase)
                     .Trim(' ', '\r', '\n', ':', '-', ',', ';', '/');
                 tankCode = Regex.Replace(description, @"\s+", " ").ToUpperInvariant();
             }
             if (tankCode.Length == 0 || expiry.Length == 0)
-                warnings.Add($"{location}: {registration} saknar tankkod eller entydigt godkännandedatum; saknade fält lämnas tomma.");
+            {
+                var missing = tankCode.Length == 0
+                    ? expiry.Length == 0 ? "tankkod och entydigt godkännandedatum" : "tankkod"
+                    : "entydigt godkännandedatum";
+                warnings.Add($"{location}: {registration} saknar {missing}; saknade fält lämnas tomma.");
+            }
             var remainder = Codes.Replace(Dates.Replace(details, ""), "");
             remainder = Regex.Replace(remainder, @"\b(Link|Trailer|Tr|SL|Dolly)\b", "", RegexOptions.IgnoreCase);
             if (Regex.IsMatch(remainder, @"\p{L}{3,}|[?]"))
@@ -122,4 +132,22 @@ internal static class VehicleCellReader
 
     internal sealed record Entry(string RegNr, string TankCode, string ApprovalExpiry,
         string? ContainerNumber, string? ContainerTankCode, int Position = 0);
+
+    private static string NormalizeCode(string code) =>
+        Regex.Replace(code, @"\s+", "").ToUpperInvariant();
+
+    public static bool EquivalentTankCodes(string first, string second) =>
+        TankCodeKey(first) == TankCodeKey(second);
+
+    private static string TankCodeKey(string value)
+    {
+        var key = value.ToUpperInvariant();
+        key = Regex.Replace(key, @"\(\+\)", "+");
+        key = Regex.Replace(key, @"\bF(?:ACK)?\s*[.:\-]?\s*(?=\d)", "");
+        key = Regex.Replace(key, @"\s+", "");
+        key = Regex.Replace(key, @"(?<=[A-Z+)])[;,/](?=\d)", "");
+        // Separators between complete codes do not change their meaning. Compartment
+        // numbers and ranges are retained, so F1&3 is not silently equated with F1-3.
+        return Regex.Replace(key, @"(?<=[A-Z+)])[;,/](?=(?:L[0-9G]|TE?\d|F\d))", "/");
+    }
 }

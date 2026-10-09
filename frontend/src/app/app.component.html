@@ -21,7 +21,8 @@
   <section *ngIf="vehicleRegistrySource" class="card" role="status">
     <strong>Fordonsregister: {{ vehicleRegistrySource }} (lokal kopia, skrivskyddad läsning)</strong>
     <p>Fordon, chaufförer, entydiga ADR-datum och åkeri läses från Excel. Saknade eller osäkra ADR-datum lämnas tomma.
-      Besiktningsdatum och fackuppgifter importeras inte ännu. Kontrollera och fyll i tankuppgifter via
+      Tankkoder (inklusive ADR och fackbeskrivningar) förifylls för bil och valda släp.
+      Besiktningsdatum och fackvolymer importeras inte ännu. Kontrollera och fyll i tankuppgifter via
       Redigera första sidan före utskrift. Demodata för chaufförer och tankbesiktning används inte.
       Självlastning måste väljas manuellt; ett namn i registret är inte ett självlastningstillstånd.</p>
     <details *ngIf="importWarnings.length">
@@ -126,6 +127,7 @@
   [products]="products"
   [trucks]="trucks"
   [registeredTrailers]="registeredTrailers"
+  [vehicleRegistrySource]="vehicleRegistrySource"
   [operators]="operators"
   (save)="onEditSave($event)"
   (close)="closeEdit()"

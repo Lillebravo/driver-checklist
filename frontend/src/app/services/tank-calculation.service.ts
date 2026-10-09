@@ -13,6 +13,28 @@ export class TankCalculationService {
   private static readonly YEARS_TANK_CONTAINER = 2.5;
   private static readonly YEARS_TANK_TRUCK_TRAILER = 3.0;
 
+  registryTankSlots(
+    truckRegNr: string, truckTankCode: string, availableTrailers: Trailer[],
+    trailer1Reg: string, trailer2Reg: string,
+    trailer1IsContainer = false, trailer2IsContainer = false,
+  ): TankSlot[] {
+    const units = [
+      { regNr: truckRegNr, source: `Bil (${truckRegNr})`, code: truckTankCode },
+      ...[trailer1Reg, trailer2Reg].map((regNr, index) => {
+        const trailer = availableTrailers.find(t => normalizeRegNr(t.regNr) === normalizeRegNr(regNr));
+        const isContainer = index === 0 ? trailer1IsContainer : trailer2IsContainer;
+        return {
+          regNr, source: `Släp ${index + 1} (${regNr})`,
+          code: isContainer ? trailer?.containerTankCode ?? '' : trailer?.tankCode ?? '',
+        };
+      }),
+    ];
+    return units.map((unit, index) => ({
+      slotNo: index + 1, source: unit.source, tankCode: unit.regNr.trim() ? unit.code : '',
+      inspectionType: '', lastInspectionMonthYear: '', expiryFormatted: '', isExpired: false,
+    }));
+  }
+
   calculateTankSlots(
     truckRegNr: string,
     truckTankCode: string,

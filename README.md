@@ -312,6 +312,9 @@ Containern registreras inte som släp och ärver inte släpets godkännandedatum
 Bil/släp med samma reg.nr dedupliceras utan hänsyn till blanksteg eller skiftläge;
 återkommande rader lägger till bilens släpkopplingar. Motstridiga tankkoder/datum
 lämnas tomma med varning, inte ersätts godtyckligt med första/sista raden.
+Rena skrivskillnader i tankkoder, exempelvis `F.2`/`F-2`/`F2`,
+blanksteg och `L4BV(+)`/`L4BV+`, orsakar inte konflikt.
+Fackintervall (`1-3`) likställs däremot inte med enskilda fack (`1&3`).
 Det gäller även olika containernummer för samma släp: ange aktuell container manuellt.
 Otydliga poster varnas med blad/rad utan att stoppa säkra poster.
 Enbart numeriska platshållare eller anteckningar utan reg.nr blir inte fordon.
@@ -319,16 +322,25 @@ Enbart numeriska platshållare eller anteckningar utan reg.nr blir inte fordon.
 Chaufförsnamn i samma cell separeras med radbrytning, semikolon eller minst två
 blanksteg. Vanliga blanksteg inom ett namn bevaras. Om bladet saknar både
 `Chaufförer` och `ADR Kort Datum` importeras enbart fordon med en synlig varning.
-ADR-datum tolkas som dag-månad-år (`25-01-2029`) eller dag/månad/år (`12/11/2028`).
+ADR-datum tolkas som dag-månad-år (`25-01-2029`), dag/månad/år (`12/11/2028`)
+eller ISO-datum (`2030-07-26`). Blanksteg kring datumstreck och dubbla kolon stöds.
 Excel-celler med datumtyp stöds också.
 En etikett som `C:`, `LP:` eller `H.` matchas mot första bokstaven, fulla
-namninitialer eller en flerteckensprefixt som `Mi:` / `Ma:` i förnamnet.
-Datum används endast om etiketten matchar **exakt ett** namn på raden.
+namninitialer, första/sista namninitialerna eller en flerteckensprefixt som
+`Mi:` / `Ma:` eller hela förnamnet (`David:`).
+Datum används endast om kopplingen är entydig. En komplett uppsättning olika
+etiketter kan exempelvis skilja `M:` från `MH:` när två chaufförer har samma förnamn.
+Namn som råkat skrivas ihop kan separeras när en enda uppdelning stöds av
+andra fullständiga namn i registret eller skilda datumetiketter; ordantal ensamt räcker inte.
 Ett datum utan etikett stöds bara när raden har ett enda chaufförsnamn.
 Namn utan entydigt datum importeras med tomt ADR-datum och varning;
 datum gissas aldrig utifrån ordningen i cellen. Ett entydigt datum på en annan rad
 för samma namn kan fylla i det saknade datumet. Motstridiga datum för samma namn
-lämnas tomma. Åkeri förifylls endast om uppgiften är entydig för chauffören.
+lämnas tomma. Ett frågetecken eller felaktigt datum för en annan etikett raderar inte
+övriga tydligt kopplade datum på raden. Formatproblem varnas fortfarande med källrad.
+Varning om saknat datum sammanställs per chaufför efter att alla rader slagits ihop,
+så att ett datum som hittats på en annan rad inte längre rapporteras som saknat.
+Åkeri förifylls endast om uppgiften är entydig för chauffören.
 Bilkopplingarna hämtas från respektive rad i stället för att välja första bilen i registret.
 Kontrollera den förvalda bilen när chauffören kör flera bilar.
 ADR-datum måste fyllas i före generering. Att finnas i registret betyder inte
@@ -337,8 +349,11 @@ att chauffören är godkänd för självlastning; assistansval görs manuellt i 
 **Inte importerat ännu:** Material, UN-nummer, signaturer, provtryckning och
 stickprov/efterkontroll.
 Excel-läget använder inga demochaufförer, påhittade fack eller demobesiktningsdatum.
-Tankkoderna visas i fordonslistorna, men tank-/besiktningsrader fylls inte automatiskt:
-kontrollera och fyll i tankuppgifter via **Redigera första sidan** före utskrift.
+Tankkoder förifylls i förhandsvisning, redigering och utskrift: bil först, sedan
+släp 1 och släp 2. `ADR` är också en tankkod. Fackbeskrivningar bevaras på respektive
+fordons tankrad, utan att uppfinna separata tankfack eller volymer.
+Saknade koder och besiktningsuppgifter förblir tomma.
+Kontrollera och fyll i återstående tankuppgifter via **Redigera första sidan** före utskrift.
 Manuellt angivna chaufförer markeras som nya enligt befintlig logik.
 Produkt- och operatörslistor är fortfarande programmets konfiguration.
 Detta är ett funktionstest av fordonsuppslag, inte ett komplett underlag för verklig utlastning.

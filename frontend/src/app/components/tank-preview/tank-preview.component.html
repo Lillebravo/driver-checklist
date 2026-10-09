@@ -15,8 +15,8 @@
       <td>Tank {{ s.slotNo }}</td>
       <td>{{ s.source }}</td>
       <td><strong>{{ s.tankCode }}</strong></td>
-      <td>{{ s.inspectionType }} ({{ s.lastInspectionMonthYear }})</td>
-      <td [class.danger-text]="s.isExpired">{{ s.expiryFormatted }} {{ s.isExpired ? 'UTGÅNGEN!' : '' }}</td>
+      <td>{{ s.lastInspectionMonthYear ? s.inspectionType + ' (' + s.lastInspectionMonthYear + ')' : 'Ej angivet' }}</td>
+      <td [class.danger-text]="s.isExpired">{{ s.expiryFormatted || 'Ej angivet' }} {{ s.isExpired ? 'UTGÅNGEN!' : '' }}</td>
       <td><span class="badge info">{{ s.nextTest }}</span></td>
     </tr>
   </tbody>

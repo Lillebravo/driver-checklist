@@ -23,6 +23,7 @@ export class ChecklistEditModalComponent implements OnDestroy {
   @Input() products: ProductDefinition[] = [];
   @Input() trucks: Truck[] = [];
   @Input() registeredTrailers: Trailer[] = [];
+  @Input() vehicleRegistrySource: string | null = null;
   @Input() isDraft = false;
 
   @Input() set request(value: GenerateChecklistRequest | null) {
@@ -208,9 +209,17 @@ export class ChecklistEditModalComponent implements OnDestroy {
     const key = this.currentVehicleKey();
     if (key !== this.vehicleKey) {
       this.vehicleKey = key;
-      this.model.tankSlots = this.tanks.calculateTankSlots(this.model.truck.regNr, truck?.tankCode ?? '',
-        allTrailers(this.trucks, this.registeredTrailers), this.model.trailers[0]?.regNr ?? '', this.model.trailers[1]?.regNr ?? '')
-        .map(s => ({ ...s }));
+      const trailers = allTrailers(this.trucks, this.registeredTrailers);
+      const trailerRegs = [this.model.trailers[0]?.regNr ?? '', this.model.trailers[1]?.regNr ?? ''];
+      const containers = trailerRegs.map(reg => trailers.find(t => normalizeRegNr(t.regNr) === normalizeRegNr(reg))?.containerNumber ?? '');
+      if (this.vehicleRegistrySource) {
+        this.model.tankSlots = this.tanks.registryTankSlots(this.model.truck.regNr, truck?.tankCode ?? '',
+          trailers, trailerRegs[0], trailerRegs[1], !!containers[0], !!containers[1]);
+        this.changeContainerNumber(containers.filter(Boolean).join(' / '));
+      } else {
+        this.model.tankSlots = this.tanks.calculateTankSlots(this.model.truck.regNr, truck?.tankCode ?? '',
+          trailers, trailerRegs[0], trailerRegs[1]).map(s => ({ ...s }));
+      }
       this.padTanks();
     }
   }

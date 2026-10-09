@@ -52,9 +52,50 @@ describe('AppComponent', () => {
     const app = fixture.componentInstance;
     expect(app.trucks[0].regNr).toBe('MBP 94C');
     expect(app.drivers).toEqual([]);
-    expect(app.calculateTankSlots()).toEqual([]);
+    app.selectedTruckReg = 'MBP 94C';
+    expect(app.calculateTankSlots()[0].tankCode).toBe('L4BN');
+    expect(app.calculateTankSlots().every(s =>
+      !s.inspectionType && !s.lastInspectionMonthYear && !s.expiryFormatted)).toBeTrue();
     expect((fixture.nativeElement as HTMLElement).querySelector('[role="status"]')?.textContent)
       .toContain('Regnummer.xlsx');
+    http.verify();
+  });
+
+  it('carries registry ADR and trailer descriptions through preview, drafts and generation without invented inspection data', () => {
+    const app = TestBed.createComponent(AppComponent).componentInstance;
+    app.vehicleRegistrySource = 'Regnummer.xlsx';
+    app.trucks = [{ regNr: 'AAA 123', tankCode: 'ADR', approvalExpiry: '2027-06-17', trailers: [] }];
+    app.registeredTrailers = [{
+      regNr: 'BBB 123', tankCode: 'FACK 1&3: L4BH (+)VP FACK 2: L4BH',
+      approvalExpiry: '2026-09-30', compartments: [],
+    }];
+    app.selectedTruckReg = 'aaa123';
+    app.selectedTrailer1Reg = 'BBB123';
+    app.selectedDriverName = 'Test Driver';
+    app.driverAdrExpiry = '2030-01-01';
+    app.products = [{
+      code: 'PIX311', displayName: 'PIX 311', family: 'PIX', unNumber: 'UN 2582',
+      template: ChecklistTemplate.Type1_PixPaxSasBdp, loadingStationId: 'PIX', selected: true,
+    }];
+    expect(app.calculateTankSlots().map(s => s.tankCode)).toEqual(['ADR', app.registeredTrailers[0].tankCode!, '']);
+    app.openDraft(app.getPrintJobs()[0]);
+    expect(app.editingRequest!.tankSlots[0].tankCode).toBe('ADR');
+    expect(app.editingRequest!.tankSlots[1].tankCode).toContain('FACK 2');
+    app.onEditSave(app.editingRequest!);
+    app.generateChecklists();
+    const http = TestBed.inject(HttpTestingController);
+    const call = http.expectOne(r => r.url.endsWith('/generate'));
+    expect(call.request.body.tankSlots[0].tankCode).toBe('ADR');
+    expect(call.request.body.tankSlots[1].tankCode).toContain('FACK 1&3');
+    expect(call.request.body.tankSlots.every((s: { inspectionType: string; lastInspectionMonthYear: string; expiryFormatted: string }) =>
+      !s.inspectionType && !s.lastInspectionMonthYear && !s.expiryFormatted)).toBeTrue();
+    call.flush(new Blob(['test']));
+    app.selectedTruckReg = 'UNKNOWN';
+    expect(app.calculateTankSlots()[0].tankCode).toBe('');
+    app.selectedTruckReg = 'AAA 123';
+    app.selectedTrailer1Reg = '';
+    app.selectedTrailer2Reg = 'BBB 123';
+    expect(app.calculateTankSlots().map(s => s.tankCode)).toEqual(['ADR', '', app.registeredTrailers[0].tankCode!]);
     http.verify();
   });
 

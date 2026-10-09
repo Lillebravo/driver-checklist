@@ -44,7 +44,17 @@ information manually. Unclear entries do not block the rest of the register.
 Missing/ambiguous ADR dates remain blank and show warnings. A clear date for
 the same full driver name on another row can resolve a missing date.
 Conflicting dates remain blank. Verify the selected truck and ADR card.
-Inspection dates/compartments are not imported. Review and fill in tank
+ISO dates, full first-name labels and repeated colons are also supported.
+Repeated full names and distinct date labels can resolve missing name
+separators only when the split is unambiguous. Missing-date warnings are
+summarized after merging all driver rows; resolved dates are not reported
+as missing. Unreadable fragments still warn without discarding unrelated
+clearly labelled dates.
+Tank codes, including ADR and complete compartment descriptions, now fill
+the preview, editor and generated checklist: truck, trailer 1, trailer 2.
+Formatting-only differences do not clear matching duplicate tank codes.
+Unknown codes remain blank. Inspection dates, compartment volumes and
+individual compartments are not imported. Review and fill in remaining tank
 details using first-page editing before printing. Self-loading permission
 is not inferred from being listed in the register.
 Container annotations attached to a trailer automatically select its TC

@@ -149,4 +149,45 @@ describe('First-page editor', () => {
     fixture.detectChanges();
     expect(element.querySelector('textarea')).toBe(textarea);
   });
+
+  it('rebuilds imported tank codes when vehicles change without introducing demo inspection dates', () => {
+    const component = TestBed.createComponent(ChecklistEditModalComponent).componentInstance;
+    component.vehicleRegistrySource = 'Regnummer.xlsx';
+    component.trucks = [{ regNr: 'AAA 123', tankCode: 'ADR', approvalExpiry: '', trailers: [] }];
+    component.registeredTrailers = [{ regNr: 'BBB 123', tankCode: 'L4BH', approvalExpiry: '', compartments: [] }];
+    component.request = request;
+    component.model!.truck.regNr = 'AAA123';
+    component.updateVehicleStatus(component.model!.truck, true);
+    component.addTrailer();
+    component.model!.trailers[0].regNr = 'BBB123';
+    component.updateVehicleStatus(component.model!.trailers[0]);
+    expect(component.model!.tankSlots.map(s => s.tankCode)).toEqual(['ADR', 'L4BH', '', '']);
+    expect(component.model!.tankSlots.every(s => !s.inspectionType && !s.lastInspectionMonthYear && !s.expiryFormatted)).toBeTrue();
+    component.model!.tankSlots[0].tankCode = 'MANUAL';
+    component.model!.firstPage = component.page!;
+    component.request = component.model;
+    expect(component.model!.tankSlots[0].tankCode).toBe('MANUAL');
+    component.removeTrailer(0);
+    expect(component.model!.tankSlots.map(s => s.tankCode)).toEqual(['ADR', '', '', '']);
+  });
+
+  it('uses imported container codes and identity when changing trailers in registry mode', () => {
+    const component = TestBed.createComponent(ChecklistEditModalComponent).componentInstance;
+    component.vehicleRegistrySource = 'Regnummer.xlsx';
+    component.registeredTrailers = [{
+      regNr: 'BBB123', tankCode: 'ADR', approvalExpiry: '', compartments: [],
+      containerNumber: 'TEST123456-7', containerTankCode: 'T11',
+    }];
+    component.request = request;
+    component.addTrailer();
+    component.model!.trailers[0].regNr = 'BBB123';
+    component.updateVehicleStatus(component.model!.trailers[0]);
+    expect(component.model!.tankSlots[1].tankCode).toBe('T11');
+    expect(component.model!.tankSlots[1].lastInspectionMonthYear).toBe('');
+    expect(component.page!.containerNumber).toBe('TEST123456-7');
+    expect(component.page!.rows[0].tc).toBeTrue();
+    component.removeTrailer(0);
+    expect(component.page!.containerNumber).toBe('');
+    expect(component.page!.rows[0].tc).toBeFalse();
+  });
 });

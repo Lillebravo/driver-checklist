@@ -162,7 +162,12 @@ export class AppComponent implements OnInit {
 
   calculateTankSlots(): TankSlot[] {
     if (this.vehicleRegistrySource) {
-      return [];
+      const truck = this.trucks.find(t => normalizeRegNr(t.regNr) === normalizeRegNr(this.selectedTruckReg));
+      return this.tankCalculation.registryTankSlots(
+        this.selectedTruckReg, truck?.tankCode ?? (this.isNewTruck ? this.truckTankCode : ''),
+        this.currentTrailers, this.selectedTrailer1Reg, this.selectedTrailer2Reg,
+        this.trailer1IsTankContainer, this.trailer2IsTankContainer,
+      );
     }
     return this.tankCalculation.calculateTankSlots(
       this.selectedTruckReg,

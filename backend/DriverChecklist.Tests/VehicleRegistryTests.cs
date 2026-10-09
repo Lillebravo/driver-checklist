@@ -20,6 +20,7 @@ internal static class VehicleRegistryTests
             "Trailer registrations must be deduplicated.");
         Check(hash.SequenceEqual(SHA256.HashData(File.ReadAllBytes(path))), "Source workbook must remain unchanged.");
         Console.WriteLine($"PASS: read-only workbook import: {data.Trucks.Count} trucks, {trailers.Count} trailers, {data.Drivers.Count} drivers, {data.ImportWarnings!.Count} warnings.");
+        Console.WriteLine($"ADR dates: {data.Drivers.Count(d => d.AdrExpiry.Length > 0)} known, {data.Drivers.Count(d => d.AdrExpiry.Length == 0)} unknown.");
         foreach (var warning in data.ImportWarnings)
             Console.WriteLine(warning);
     }
@@ -145,6 +146,65 @@ internal static class VehicleRegistryTests
             Check(marlene.AdrExpiry == "2028-04-24" && marlene.TruckRegNrs!.Count == 3,
                 "Later clear dates must fill all entries for the same name, without using an ambiguous M date.");
             Check(repeated.ImportWarnings!.Count > 0, "The original ambiguous row must still be reported for review.");
+            Check(!repeated.ImportWarnings!.Any(w => w.Contains("ADR-datum saknas eller är osäkert för Marlene Sample")),
+                "Missing dates resolved on a later duplicate must not produce misleading final missing-date warnings.");
+
+            WriteWorkbook(path, [
+                ("AAA 123 ADR", ""), ("BBB 123 ADR", ""), ("CCC 123 ADR", ""),
+                ("DDD 123 ADR", ""), ("EEE 123 ADR", ""), ("FFF 123 ADR", ""),
+                ("GGG 123 ADR", ""), ("HHH 123 ADR", ""), ("III 123 ADR", ""),
+                ("JJJ 123 ADR", ""), ("KKK 123 ADR", ""), ("LLL 123 ADR", ""),
+                ("MMM 123 ADR", ""),
+            ], driverRows: [
+                ("David Test  Daniel Example  Alex Middle Sample", "David: 2030-07-26 Daniel: 13 - 06 - 2028 AS:17-09-2031", "Carrier"),
+                ("Henrik Example  Johan Sample  Michael Test", "H:29-12-2029 J:2026-04-01 M:17-11-2029", "Carrier"),
+                ("Fredrik Example  Kim Sample", "F:12-04-2027 K: :20-02-2030", "Carrier"),
+                ("Morten Example  Morten Sample", "M:08-09-2029 MS:06-12-2026", "Carrier"),
+                ("Morten Example", "M:08-09-2029", "Carrier"),
+                ("Jasmine Example", "17-03-2030", "Carrier"),
+                ("Jasmine Example Nicklas Sample", "J:17-03-2030 N:27-05-2029", "Carrier"),
+                ("Thomas Sample", "T:30-01-2029", "Carrier"),
+                ("Aleksej Example Thomas Sample", "? T:30-01-2029", "Carrier"),
+                ("John Example  Jane Sample", "J:01-01-2030", "Carrier"),
+                ("Invalid Example  Valid Sample", "I:01-05-20231 V:14/01/2027", "Carrier"),
+                ("Conflicting Sample", "CS:01-01-2030 CS:02-01-2030", "Carrier"),
+                ("Conflicting Sample", "CS:01-01-2030", "Carrier"),
+            ]);
+            var adrFormats = service.GetInitData();
+            Check(adrFormats.Drivers.Single(d => d.Name == "David Test").AdrExpiry == "2030-07-26"
+                && adrFormats.Drivers.Single(d => d.Name == "Daniel Example").AdrExpiry == "2028-06-13"
+                && adrFormats.Drivers.Single(d => d.Name == "Alex Middle Sample").AdrExpiry == "2031-09-17",
+                "Full first-name labels, ISO dates, spaces and first/last initials must work.");
+            Check(adrFormats.Drivers.Where(d => new[] { "Henrik Example", "Johan Sample", "Michael Test", "Kim Sample" }.Contains(d.Name))
+                .All(d => d.AdrExpiry.Length > 0), "Mixed date formats and repeated colons must preserve independent dates.");
+            Check(adrFormats.Drivers.Single(d => d.Name == "Morten Example").AdrExpiry == "2029-09-08"
+                && adrFormats.Drivers.Single(d => d.Name == "Morten Sample").AdrExpiry == "2026-12-06",
+                "Complete uniquely constrained initials must match M and MS to separate people.");
+            Check(adrFormats.Drivers.Single(d => d.Name == "Nicklas Sample").AdrExpiry == "2029-05-27"
+                && adrFormats.Drivers.Single(d => d.Name == "Jasmine Example").TruckRegNrs!.Count == 2,
+                "Distinct ADR labels must safely separate concatenated complete driver names.");
+            Check(adrFormats.Drivers.Single(d => d.Name == "Thomas Sample").AdrExpiry == "2029-01-30"
+                && adrFormats.Drivers.Any(d => d.Name == "Aleksej Example")
+                && adrFormats.Drivers.All(d => d.Name != "Aleksej Example Thomas Sample"),
+                "A repeated complete name plus matching label resolves a missing name separator, without guessing the other ADR date.");
+            Check(adrFormats.Drivers.Where(d => new[] { "John Example", "Jane Sample" }.Contains(d.Name))
+                .All(d => d.AdrExpiry.Length == 0), "An incomplete ambiguous J label must stay unresolved.");
+            Check(adrFormats.Drivers.Single(d => d.Name == "Invalid Example").AdrExpiry == ""
+                && adrFormats.Drivers.Single(d => d.Name == "Valid Sample").AdrExpiry == "2027-01-14",
+                "An invalid year must not be truncated or discard another clearly labelled date.");
+            Check(adrFormats.Drivers.Single(d => d.Name == "Conflicting Sample").AdrExpiry == "",
+                "Conflicting dates in one row must remain blank after later duplicates.");
+            Check(adrFormats.ImportWarnings!.Count(w => w.Contains("ADR-datum saknas eller är osäkert för Jasmine Example")) == 0,
+                "A resolved repeated driver must not retain a misleading missing-date warning.");
+            WriteWorkbook(path, [("AAA 123 ADR", ""), ("BBB 123 ADR", "")], driverRows: [
+                ("Arend Jan Test Sample", "A:25-09-2030", "Carrier"),
+                ("Morten Example  Morten Sample", "M:01-01-2030 M:02-01-2030", "Carrier"),
+            ]);
+            var ambiguousNames = service.GetInitData();
+            Check(ambiguousNames.Drivers.Single(d => d.Name == "Arend Jan Test Sample").AdrExpiry == "2030-09-25",
+                "Long genuine driver names must not be split solely by word count.");
+            Check(ambiguousNames.Drivers.Where(d => d.Name.StartsWith("Morten")).All(d => d.AdrExpiry == ""),
+                "Repeated identical initials cannot be assigned by position.");
 
             WriteWorkbook(path, [
                 ("ABC 123: ADR 2027-04-26", "XYZ 789: ADR 2027-09-01                        Cont. TEST 725001-0: L4BN"),
@@ -271,6 +331,42 @@ internal static class VehicleRegistryTests
                 workbook.Save();
             }
             Check(service.GetInitData().Drivers.Single().AdrExpiry == "2030-04-25", "Excel date-typed ADR cells are supported.");
+
+            WriteWorkbook(path, [
+                ("AAA 123: ADR 2027-06-17", "BBB 123: Fack 1&3: L4BH (+)VP Fack 2: L4BH - 2026-09-30"),
+                ("AAA123: ADR 2027-06-17", "BBB123: Fack 1&3: L4BH (+)VP Fack 2: L4BH -2026-09-30"),
+                ("CCC 123: ADR", "DDD 123: L4BH 2027-03-04 TST 685, dolly ?"),
+                ("EEE 123", "FFF 123: L4BN F1& 3 L4BH F.2 2027-01-01"),
+                ("EEE 123", "FFF 123: L4BN F.1&3 L4BH F2 2027-01-01"),
+                ("GGG 123: ADR", "HHH 123: F1-3 L4BH F-2 L4BV+ 2027-01-01"),
+                ("GGG 123: ADR", "HHH 123: F1-3 L4BH F.2 L4BV(+) 2027-01-01"),
+                ("III 123: ADR", "JJJ 123: F1&3 L4BH F2 L4BN 2027-01-01"),
+                ("III 123: ADR", "JJJ 123: 1&3 L4BH, 2 L4BN 2027-01-01"),
+                ("KKK 123: ADR", "LLL 123: L4BN, L4BV+ 2027-01-01"),
+                ("KKK 123: ADR", "LLL 123: L4BN / L4BV(+) 2027-01-01"),
+            ]);
+            var robust = service.GetInitData();
+            Check(robust.Trucks[0].TankCode == "ADR" && robust.Trucks[0].ApprovalExpiry == "2027-06-17",
+                "ADR must be preserved as an explicit truck code.");
+            Check(robust.Trailers!.Single(t => t.RegNr == "BBB 123").TankCode == "FACK 1&3: L4BH (+)VP FACK 2: L4BH",
+                "Reported trailer compartment description must survive whitespace and duplicate rows.");
+            Check(robust.Trailers!.Single(t => t.RegNr == "DDD 123").ApprovalExpiry == "2027-03-04"
+                && robust.Trailers!.Any(t => t.RegNr == "TST 685")
+                && robust.Trailers!.All(t => t.RegNr != "04 TST 685"),
+                "Dates must not be consumed as a digit-first prefix of the next registration.");
+            Check(robust.Trailers!.Single(t => t.RegNr == "FFF 123").TankCode!.EndsWith("F.2"),
+                "Compartment labels following a tank code must not be discarded.");
+            Check(new[] { "FFF 123", "HHH 123", "JJJ 123", "LLL 123" }.All(reg =>
+                !string.IsNullOrEmpty(robust.Trailers!.Single(t => t.RegNr == reg).TankCode)),
+                "Equivalent punctuation, F labels and (+)/+ must not cause false conflicts.");
+            Check(robust.Trucks.Single(t => t.RegNr == "EEE 123").TankCode == "",
+                "Missing code must not be guessed as ADR.");
+            WriteWorkbook(path, [
+                ("AAA 123 ADR", "BBB 123 F1&3 L4BH F2 L4BN 2027-01-01"),
+                ("AAA 123 ADR", "BBB 123 F1-3 L4BH F2 L4BN 2027-01-01"),
+            ]);
+            Check(service.GetInitData().Trailers!.Single().TankCode == "",
+                "Compartment ranges must not silently be treated as selected compartment numbers.");
             ExpectInvalid(service, path, [], "inga fordonsrader");
             WriteWorkbook(path, [], trailerHeader: "Unknown");
             Expect<InvalidDataException>(() => service.GetInitData(), "Släp/Trailer");

@@ -14,10 +14,6 @@ namespace DriverChecklist.Api.Services;
 /// </summary>
 public class MasterDataService : IMasterDataService
 {
-    private static readonly Regex AdrPattern = new(
-        @"(?:(?<initials>\p{L}{1,3})\s*[:.]\s*)?(?<date>[0-9]{1,2}[-/][0-9]{1,2}[-/][0-9]{4})",
-        RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-
     private readonly MasterDataOptions _options;
 
     public MasterDataService(IOptions<MasterDataOptions> options)
@@ -40,6 +36,7 @@ public class MasterDataService : IMasterDataService
         var trailers = new Dictionary<string, TrailerInfo>(StringComparer.Ordinal);
         var drivers = new Dictionary<string, DriverInfo>(StringComparer.OrdinalIgnoreCase);
         var uncertainDrivers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var driverRows = new List<(string Names, string Adr, string Haulier, string Truck, string Location)>();
         var warnings = new List<string>();
         var conflicts = new HashSet<string>(StringComparer.Ordinal);
         var trailerPositions = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -132,13 +129,27 @@ public class MasterDataService : IMasterDataService
 
                 if (driverColumn is not null && adrColumn is not null)
                 {
-                    ImportDrivers(
+                    driverRows.Add((
                         row.Cell(driverColumn.Value).GetString(),
                         AdrCellText(row.Cell(adrColumn.Value)),
                         haulierColumn is null ? "" : row.Cell(haulierColumn.Value).GetString().Trim(),
-                        truck?.RegNr ?? "", location, drivers, uncertainDrivers, warnings);
+                        truck?.RegNr ?? "", location));
                 }
             }
+        }
+
+        var knownNames = driverRows.SelectMany(row => DriverCellReader.Names(row.Names))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var driverLocations = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in driverRows)
+            ImportDrivers(row.Names, row.Adr, row.Haulier, row.Truck, row.Location,
+                knownNames, drivers, uncertainDrivers, driverLocations, warnings);
+        foreach (var driver in drivers.Values.Where(driver => driver.AdrExpiry.Length == 0))
+        {
+            var locations = driverLocations[driver.Name];
+            warnings.Add($"ADR-datum saknas eller är osäkert för {driver.Name}; verifiera och fyll i manuellt. "
+                + $"Källa: {string.Join("; ", locations.Take(3))}"
+                + (locations.Count > 3 ? $" (och {locations.Count - 3} andra rader)." : "."));
         }
 
         if (!foundHeader)
@@ -195,7 +206,9 @@ public class MasterDataService : IMasterDataService
         HashSet<string> conflicts, List<string> warnings)
     {
         if (conflicts.Contains(key)) return "";
-        if (first.Length > 0 && second.Length > 0 && first != second)
+        var equal = first == second || (key.EndsWith("tankkod", StringComparison.Ordinal)
+            && VehicleCellReader.EquivalentTankCodes(first, second));
+        if (first.Length > 0 && second.Length > 0 && !equal)
         {
             conflicts.Add(key);
             warnings.Add($"{location}: motstridiga uppgifter för {key} ({first} / {second}); fältet lämnas tomt för manuell kontroll.");
@@ -204,63 +217,22 @@ public class MasterDataService : IMasterDataService
         return first.Length == 0 ? second : first;
     }
 
-    private static bool IsSeparator(string value) =>
-        value.All(character => char.IsWhiteSpace(character) || character is ';' or ',');
-
     private static void ImportDrivers(
         string namesText, string adrText, string haulier, string truckRegNr, string location,
-        Dictionary<string, DriverInfo> drivers, HashSet<string> uncertainDrivers, List<string> warnings)
+        HashSet<string> knownNames, Dictionary<string, DriverInfo> drivers, HashSet<string> uncertainDrivers,
+        Dictionary<string, List<string>> driverLocations, List<string> warnings)
     {
-        var names = Regex.Split(namesText.Trim(), @"\r\n|\r|\n|[ \t]{2,}|;")
-            .Select(name => Regex.Replace(name.Trim(), @"\s+", " "))
-            .Where(name => name.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        var dates = names.ToDictionary(name => name, _ => new List<string>(), StringComparer.OrdinalIgnoreCase);
-        var ambiguous = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var position = 0;
-        var invalidAdrText = false;
-        foreach (Match match in AdrPattern.Matches(adrText))
+        foreach (var entry in DriverCellReader.Read(namesText, adrText, knownNames, location, warnings))
         {
-            if (!IsSeparator(adrText[position..match.Index]))
-                invalidAdrText = true;
-            position = match.Index + match.Length;
-            var initials = match.Groups["initials"].Value;
-            var candidates = names.Where(name =>
-                initials.Length == 0 ? names.Count == 1 : InitialsMatch(name, initials)).ToList();
-            if (candidates.Count != 1)
-            {
-                ambiguous.UnionWith(candidates);
-                warnings.Add($"{location}: ADR-datum kan inte kopplas entydigt till en chaufför; kontrollera raden manuellt.");
-                continue;
-            }
-            if (!DateOnly.TryParseExact(match.Groups["date"].Value,
-                ["d-M-yyyy", "dd-MM-yyyy", "d/M/yyyy", "dd/MM/yyyy"],
-                CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
-            {
-                ambiguous.Add(candidates[0]);
-                warnings.Add($"{location}: ogiltigt ADR-datum; kontrollera raden manuellt.");
-                continue;
-            }
-            dates[candidates[0]].Add(date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-        }
-        if (!IsSeparator(adrText[position..]))
-            invalidAdrText = true;
-        if (invalidAdrText)
-        {
-            ambiguous.UnionWith(names);
-            warnings.Add($"{location}: ADR-fältet innehåller ett okänt format; inga datum från raden används.");
-        }
-        if (names.Count == 0 && adrText.Trim().Length > 0)
-            warnings.Add($"{location}: ADR-datum finns utan chaufförsnamn.");
-
-        foreach (var name in names)
-        {
-            var uniqueDates = dates[name].Distinct().ToList();
-            var expiry = uniqueDates.Count == 1 && !ambiguous.Contains(name) ? uniqueDates[0] : "";
-            if (expiry.Length == 0)
-                warnings.Add($"{location}: ADR-datum saknas eller är osäkert för {name}; verifiera och fyll i manuellt.");
+            var name = entry.Name;
+            var expiry = entry.Expiry;
+            if (entry.Conflicting) uncertainDrivers.Add(name);
+            if (!driverLocations.TryGetValue(name, out var locations))
+                driverLocations[name] = locations = [];
+            locations.Add(location);
             if (!drivers.TryGetValue(name, out var driver))
             {
-                driver = new DriverInfo(name, expiry, haulier.Length == 0 ? null : haulier,
+                driver = new DriverInfo(name, uncertainDrivers.Contains(name) ? "" : expiry, haulier.Length == 0 ? null : haulier,
                     truckRegNr.Length > 0 ? [truckRegNr] : []);
             }
             else
@@ -287,15 +259,6 @@ public class MasterDataService : IMasterDataService
             }
             drivers[name] = driver;
         }
-    }
-
-    private static bool InitialsMatch(string name, string initials)
-    {
-        var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var fullInitials = string.Concat(words.Select(word => word[0]));
-        return string.Equals(words[0][..1], initials, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(fullInitials, initials, StringComparison.OrdinalIgnoreCase)
-            || (initials.Length > 1 && words[0].StartsWith(initials, StringComparison.OrdinalIgnoreCase));
     }
 
 }
