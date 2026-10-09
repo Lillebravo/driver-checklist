@@ -66,6 +66,51 @@ describe('First-page editor', () => {
     expect(saved.tankSlots[0].inspectionType).toBe('L');
   });
 
+  it('defaults container checks to TC and preserves unticked checks when reopening', () => {
+    const component = TestBed.createComponent(ChecklistEditModalComponent).componentInstance;
+    component.request = request;
+    component.page!.containerNumber = 'CONT-123';
+    component.model!.firstPage = component.page!;
+    component.request = component.model;
+    expect(component.page!.rows[0].tt).toBeFalse();
+    expect(component.page!.rows[0].tc).toBeTrue();
+    component.page!.rows[0].tc = false;
+    component.model!.firstPage = component.page!;
+    component.request = component.model;
+    expect(component.page!.rows[0].tt).toBeFalse();
+    expect(component.page!.rows[0].tc).toBeFalse();
+  });
+
+  it('moves checked rows only when container presence changes and preserves other edits', () => {
+    const component = TestBed.createComponent(ChecklistEditModalComponent).componentInstance;
+    component.request = request;
+    component.page!.rows[1].tt = false;
+    component.page!.rows[0].comment = 'Keep';
+    component.page!.rows[2].rc = true;
+    component.changeContainerNumber('CONT-123');
+    expect(component.page!.rows[0]).toEqual({ row: 14, tt: false, tc: true, rc: false, comment: 'Keep' });
+    expect(component.page!.rows[1].tc).toBeFalse();
+    expect(component.page!.rows[2].rc).toBeTrue();
+    component.page!.rows[0].tc = false;
+    component.changeContainerNumber('CONT-456');
+    expect(component.page!.rows[0].tc).toBeFalse();
+    component.page!.rows[0].tc = true;
+    component.changeContainerNumber('   ');
+    expect(component.page!.rows[0].tt).toBeTrue();
+    expect(component.page!.rows[0].tc).toBeFalse();
+    expect(component.page!.rows[1].tt).toBeFalse();
+  });
+
+  it('never moves a check into a disabled TC column', () => {
+    const component = TestBed.createComponent(ChecklistEditModalComponent).componentInstance;
+    component.request = request;
+    component.definition = structuredClone(definition);
+    component.definition.rows[0].enabled[1] = false;
+    component.changeContainerNumber('CONT-123');
+    expect(component.page!.rows[0].tt).toBeTrue();
+    expect(component.page!.rows[0].tc).toBeFalse();
+  });
+
   it('disallows self-loading roles for new drivers and preserves manual check edits when reopening', () => {
     const component = TestBed.createComponent(ChecklistEditModalComponent).componentInstance;
     component.request = request;

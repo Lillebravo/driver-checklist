@@ -38,6 +38,19 @@ export class VehicleSelectComponent {
   @Input() isNewTrailer2 = false;
   @Output() isNewTrailer2Change = new EventEmitter<boolean>();
 
+  @Input() truckIsTankContainer = false;
+  @Output() truckIsTankContainerChange = new EventEmitter<boolean>();
+  @Input() truckContainerNumber = '';
+  @Output() truckContainerNumberChange = new EventEmitter<string>();
+  @Input() trailer1IsTankContainer = false;
+  @Output() trailer1IsTankContainerChange = new EventEmitter<boolean>();
+  @Input() trailer1ContainerNumber = '';
+  @Output() trailer1ContainerNumberChange = new EventEmitter<string>();
+  @Input() trailer2IsTankContainer = false;
+  @Output() trailer2IsTankContainerChange = new EventEmitter<boolean>();
+  @Input() trailer2ContainerNumber = '';
+  @Output() trailer2ContainerNumberChange = new EventEmitter<string>();
+
   get availableTrailers(): Trailer[] {
     const truck = this.trucks.find((t) => normalizeRegNr(t.regNr) === normalizeRegNr(this.truckRegNr));
     return truck ? truck.trailers : [];

@@ -70,6 +70,13 @@ export class AppComponent implements OnInit {
   selectedTrailer2Reg = '';
   isNewTrailer1 = false;
   isNewTrailer2 = false;
+  truckIsTankContainer = false;
+  truckContainerNumber = '';
+  trailer1IsTankContainer = false;
+  trailer1ContainerNumber = '';
+  trailer2IsTankContainer = false;
+  trailer2ContainerNumber = '';
+  private readonly containerTimestamp = new Date().toISOString();
 
   isGenerating = false;
   errorMessage: string | null = null;
@@ -81,7 +88,7 @@ export class AppComponent implements OnInit {
   editingChecklist: GeneratedChecklist | null = null;
   editingJob: PrintJob | null = null;
   editingRequest: GenerateChecklistRequest | null = null;
-  drafts = new Map<string, { request: GenerateChecklistRequest; baseline: string }>();
+  drafts = new Map<string, { request: GenerateChecklistRequest; baseline: string; containerNumber: string }>();
   isSavingEdit = false;
 
   readonly checklistTemplateLabel = checklistTemplateLabel;
@@ -173,6 +180,14 @@ export class AppComponent implements OnInit {
       // självlastare - kryssa i "Själv lastn" automatiskt för dem. För en ny/
       // manuellt inmatad chaufför vet vi inget om detta, så inget kryssas i.
       assistType: this.isNewDriver ? AssistType.Unspecified : AssistType.SelfLoading,
+      ...(this.currentContainerNumber ? {
+        firstPage: {
+          timestamp: this.containerTimestamp,
+          sapNumber: '', loadingAmount: '', containerNumber: this.currentContainerNumber,
+          unNumbers: [...new Set(job.products.map(p => p.unNumber))],
+          rows: [], roles: [], compartmentVolumes: [],
+        },
+      } : {}),
     };
   }
 
@@ -254,8 +269,18 @@ export class AppComponent implements OnInit {
     const draft = this.drafts.get(`${job.template}_${job.station}`);
     this.editingChecklist = null;
     this.editingJob = job;
-    this.editingRequest = draft?.baseline === JSON.stringify(request)
-      ? draft.request : { ...request, firstPage: draft?.request.firstPage };
+    this.editingRequest = draft?.baseline === JSON.stringify(request) ? draft.request : {
+      ...request,
+      firstPage: draft?.request.firstPage ? {
+        ...draft.request.firstPage,
+        containerNumber: draft.containerNumber !== this.currentContainerNumber
+          ? this.currentContainerNumber : draft.request.firstPage.containerNumber,
+        rows: draft.containerNumber !== this.currentContainerNumber &&
+          draft.request.firstPage.containerNumber.trim() && !this.currentContainerNumber
+          ? draft.request.firstPage.rows.map(row => ({ ...row, tt: row.tt || row.tc, tc: false }))
+          : draft.request.firstPage.rows,
+      } : request.firstPage,
+    };
     if (draft && draft.baseline !== JSON.stringify(request)) {
       this.errorMessage = 'Utkastets transportuppgifter har uppdaterats från underlaget. Kontrollkryss och kommentarer är bevarade.';
     }
@@ -291,6 +316,7 @@ export class AppComponent implements OnInit {
       this.drafts.set(key, {
         request: editedRequest,
         baseline: JSON.stringify(this.buildRequest(job, this.calculateTankSlots())),
+        containerNumber: this.currentContainerNumber,
       });
       this.closeEdit();
       this.errorMessage = null;
@@ -327,5 +353,13 @@ export class AppComponent implements OnInit {
 
   private get currentTrailers() {
     return allTrailers(this.trucks);
+  }
+
+  private get currentContainerNumber(): string {
+    return [
+      this.truckIsTankContainer ? this.truckContainerNumber.trim() : '',
+      this.trailer1IsTankContainer ? this.trailer1ContainerNumber.trim() : '',
+      this.trailer2IsTankContainer ? this.trailer2ContainerNumber.trim() : '',
+    ].filter(Boolean).join(' / ');
   }
 }

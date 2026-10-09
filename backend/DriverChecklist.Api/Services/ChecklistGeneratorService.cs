@@ -175,12 +175,13 @@ public class ChecklistGeneratorService : IChecklistGeneratorService
         var a13 = sheet.Cell("A13").GetString();
         sheet.Cell("A13").Value = TickCheckbox(a13, "Vakt");
 
-        // B14 t.o.m B19 (TT-kolumnen): markera med ett stort, fetstilt X som
+        // B14 t.o.m B19 (TC i kolumn C för container): markera med ett stort, fetstilt X som
         // fyller hela rutan, istället för det tidigare lilla ordet "Ja"
         // - dessa kontrollpunkter är sådana systemet redan vet svaret på.
         for (var r = 14; r <= 19; r++)
         {
-            var cell = sheet.Cell(r, 2);
+            var column = string.IsNullOrWhiteSpace(req.FirstPage?.ContainerNumber) ? 2 : 3;
+            var cell = sheet.Cell(r, column);
             cell.Value = "X";
             cell.Style.Font.FontSize = 24;
             cell.Style.Font.Bold = true;

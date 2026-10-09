@@ -1,5 +1,15 @@
 /* Komponentspecifik styling - delade klasser (card, badge, field-row m.fl.) ligger i src/styles.css */
 .field-row { position: relative; }
+.vehicle-row { display: flex; align-items: flex-end; gap: .65rem; }
+.registration-field { flex: 0 0 145px; min-width: 0; }
+.container-field { flex: 1; min-width: 0; }
+.container-field label { font-size: .8rem; }
+.container-toggle { display: flex; align-items: center; gap: .35rem; margin: 0 0 1.65rem; white-space: nowrap; }
+.container-toggle input { width: 18px; height: 18px; margin: 0; }
+@media (max-width: 420px) {
+  .vehicle-row { flex-wrap: wrap; }
+  .container-field { flex-basis: 100%; }
+}
 .trailer-options { position: absolute; top: 75px; left: 0; right: 0; z-index: 10; background: white; border: 1px solid #cbd5e1; border-radius: 10px; box-shadow: 0 8px 24px #0f172a24; max-height: 300px; overflow-y: auto; }
 .trailer-group { padding: .65rem; }
 .trailer-group + .trailer-group { border-top: 1px solid #cbd5e1; }

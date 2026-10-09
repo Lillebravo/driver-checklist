@@ -31,7 +31,7 @@
               </div>
               <label>Kemira SAP Nr<input type="text" [(ngModel)]="p.sapNumber" /></label>
               <label>Preliminär lastningsmängd (ton)<input type="text" inputmode="decimal" [(ngModel)]="p.loadingAmount" /></label>
-              <label>Container/Järnvägsvagns nr<input type="text" [(ngModel)]="p.containerNumber" /></label>
+              <label>Container/Järnvägsvagns nr<input type="text" [ngModel]="p.containerNumber" (ngModelChange)="changeContainerNumber($event)" /></label>
               <div>
                 <label>UN Nummer</label>
                 <div class="inline-options">

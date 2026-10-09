@@ -93,4 +93,37 @@ describe('AppComponent', () => {
     expect(app.errorMessage).toContain('Underlaget har ändrats');
     TestBed.inject(HttpTestingController).expectNone(r => r.url.endsWith('/generate'));
   });
+
+  it('passes manual container numbers to drafts and generation and omits them when TC is off', () => {
+    const app = TestBed.createComponent(AppComponent).componentInstance;
+    app.products = [{
+      code: 'PIX311', displayName: 'PIX 311', family: 'PIX', unNumber: 'UN 2582',
+      template: ChecklistTemplate.Type1_PixPaxSasBdp, loadingStationId: 'PIX', selected: true,
+    }];
+    app.truckIsTankContainer = true;
+    app.truckContainerNumber = ' CONT-123 ';
+    app.trailer1IsTankContainer = true;
+    app.trailer1ContainerNumber = ' CONT-456 ';
+    app.trailer2IsTankContainer = true;
+    app.trailer2ContainerNumber = ' CONT-789 ';
+    app.openDraft(app.getPrintJobs()[0]);
+    expect(app.editingRequest!.firstPage?.containerNumber).toBe('CONT-123 / CONT-456 / CONT-789');
+    app.onEditSave(app.editingRequest!);
+    app.generateChecklists();
+    const http = TestBed.inject(HttpTestingController);
+    const call = http.expectOne(r => r.url.endsWith('/generate'));
+    expect(call.request.body.firstPage.containerNumber).toBe('CONT-123 / CONT-456 / CONT-789');
+    call.flush(new Blob(['test']));
+    app.truckIsTankContainer = false;
+    app.trailer1IsTankContainer = false;
+    app.trailer2IsTankContainer = false;
+    app.openDraft(app.getPrintJobs()[0]);
+    expect(app.editingRequest!.firstPage?.containerNumber).toBe('');
+    app.onEditSave(app.editingRequest!);
+    app.generateChecklists();
+    const withoutContainer = http.expectOne(r => r.url.endsWith('/generate'));
+    expect(withoutContainer.request.body.firstPage.containerNumber).toBe('');
+    withoutContainer.flush(new Blob(['test']));
+    http.verify();
+  });
 });

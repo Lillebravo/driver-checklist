@@ -170,6 +170,20 @@ foreach (var templateType in new[] { ChecklistTemplate.Type1_PixPaxSasBdp, Check
         "Åkeriet", new("ABC123", true, "2028-04-05"), [new("DEF456", true, "2028-06-07")],
         [new("L4BH", "L", "2026-08", "", false), new("T22", "P", "2026-09", "", false)],
         [], AssistType.FullAssist, firstPage);
+    foreach (var containerNumber in new[] { "CONT-456", "", "   " })
+    {
+        var automatic = edited with { FirstPage = firstPage with { ContainerNumber = containerNumber, Rows = [], Roles = [] } };
+        using var content = generator.Generate(automatic)!.Content;
+        using var workbook = new XLWorkbook(content);
+        var sheet = workbook.Worksheet(1);
+        var isContainer = !string.IsNullOrWhiteSpace(containerNumber);
+        for (var row = 14; row <= 19; row++)
+        {
+            Assert(sheet.Cell(row, 2).GetString() == (isContainer ? "" : "X"), "Automatic TT column incorrect.");
+            Assert(sheet.Cell(row, 3).GetString() == (isContainer ? "X" : ""), "Automatic TC column incorrect.");
+        }
+        count++;
+    }
     Assert(generator.Validate(edited) is null, "Valid first-page request rejected.");
     using (var content = generator.Generate(edited)!.Content)
     using (var workbook = new XLWorkbook(content))

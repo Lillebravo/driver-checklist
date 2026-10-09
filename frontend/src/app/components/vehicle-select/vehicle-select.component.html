@@ -1,57 +1,97 @@
 <h3>2. Fordonsekipage</h3>
-<label for="truckRegNr">Dragbil Reg.nr:</label>
-<input
-  id="truckRegNr"
-  type="text"
-  [ngModel]="truckRegNr"
-  (ngModelChange)="onTruckInput($event)"
-  list="truckList"
-  placeholder="T.ex. JAF 58E"
-/>
-<datalist id="truckList">
-  <option *ngFor="let t of trucks" [value]="t.regNr"></option>
-</datalist>
-
-<div *ngIf="isNewTruck" class="badge warning">Ny Dragbil</div>
+<div class="field-row">
+  <div class="vehicle-row">
+    <div class="registration-field">
+      <label for="truckRegNr">Dragbil Reg.nr:</label>
+      <input
+        id="truckRegNr"
+        type="text"
+        [ngModel]="truckRegNr"
+        (ngModelChange)="onTruckInput($event)"
+        list="truckList"
+        placeholder="T.ex. JAF 58E"
+      />
+    </div>
+    <label class="container-toggle">
+      <input type="checkbox" aria-label="TC Dragbil" [ngModel]="truckIsTankContainer"
+        (ngModelChange)="truckIsTankContainerChange.emit($event)" />TC
+    </label>
+    <div *ngIf="truckIsTankContainer" class="container-field">
+      <label for="truckContainerNumber">Containernummer (Dragbil):</label>
+      <input id="truckContainerNumber" type="text" [ngModel]="truckContainerNumber"
+        (ngModelChange)="truckContainerNumberChange.emit($event)" placeholder="Containernummer" />
+    </div>
+  </div>
+  <datalist id="truckList">
+    <option *ngFor="let t of trucks" [value]="t.regNr"></option>
+  </datalist>
+  <div *ngIf="isNewTruck" class="badge warning">Ny Dragbil</div>
+</div>
 
 <div class="field-row">
-  <label for="trailer1Reg">Släpvagn 1:</label>
-  <input
-    id="trailer1Reg"
-    type="text"
-    [ngModel]="trailer1Reg"
-    (ngModelChange)="onTrailer1Input($event)"
-    role="combobox"
-    aria-autocomplete="list"
-    [attr.aria-expanded]="activeTrailer === 1"
-    aria-controls="trailer-options-1"
-    autocomplete="off"
-    (focus)="activeTrailer = 1; activeSuggestion = -1"
-    (blur)="activeTrailer = null"
-    (keydown)="onTrailerKey($event, 1)"
-    placeholder="Välj eller skriv in nytt släp"
-  />
+  <div class="vehicle-row">
+    <div class="registration-field">
+      <label for="trailer1Reg">Släpvagn 1:</label>
+      <input
+        id="trailer1Reg"
+        type="text"
+        [ngModel]="trailer1Reg"
+        (ngModelChange)="onTrailer1Input($event)"
+        role="combobox"
+        aria-autocomplete="list"
+        [attr.aria-expanded]="activeTrailer === 1"
+        aria-controls="trailer-options-1"
+        autocomplete="off"
+        (focus)="activeTrailer = 1; activeSuggestion = -1"
+        (blur)="activeTrailer = null"
+        (keydown)="onTrailerKey($event, 1)"
+        placeholder="Reg.nr"
+      />
+    </div>
+    <label class="container-toggle">
+      <input type="checkbox" aria-label="TC Släp 1" [ngModel]="trailer1IsTankContainer"
+        (ngModelChange)="trailer1IsTankContainerChange.emit($event)" />TC
+    </label>
+    <div *ngIf="trailer1IsTankContainer" class="container-field">
+      <label for="trailer1ContainerNumber">Containernummer (Släp 1):</label>
+      <input id="trailer1ContainerNumber" type="text" [ngModel]="trailer1ContainerNumber"
+        (ngModelChange)="trailer1ContainerNumberChange.emit($event)" placeholder="Containernummer" />
+    </div>
+  </div>
   <ng-container *ngTemplateOutlet="suggestions; context: { slot: 1 }"></ng-container>
   <div *ngIf="isNewTrailer1" class="badge warning">Nytt Släp 1</div>
 </div>
 
 <div class="field-row">
-  <label for="trailer2Reg">Släpvagn 2 (valfritt):</label>
-  <input
-    id="trailer2Reg"
-    type="text"
-    [ngModel]="trailer2Reg"
-    (ngModelChange)="onTrailer2Input($event)"
-    role="combobox"
-    aria-autocomplete="list"
-    [attr.aria-expanded]="activeTrailer === 2"
-    aria-controls="trailer-options-2"
-    autocomplete="off"
-    (focus)="activeTrailer = 2; activeSuggestion = -1"
-    (blur)="activeTrailer = null"
-    (keydown)="onTrailerKey($event, 2)"
-    placeholder="Välj eller skriv in nytt släp"
-  />
+  <div class="vehicle-row">
+    <div class="registration-field">
+      <label for="trailer2Reg">Släpvagn 2 (valfritt):</label>
+      <input
+        id="trailer2Reg"
+        type="text"
+        [ngModel]="trailer2Reg"
+        (ngModelChange)="onTrailer2Input($event)"
+        role="combobox"
+        aria-autocomplete="list"
+        [attr.aria-expanded]="activeTrailer === 2"
+        aria-controls="trailer-options-2"
+        autocomplete="off"
+        (focus)="activeTrailer = 2; activeSuggestion = -1"
+        (blur)="activeTrailer = null"
+        (keydown)="onTrailerKey($event, 2)"
+        placeholder="Reg.nr"
+      />
+    </div>
+    <label class="container-toggle">
+      <input type="checkbox" aria-label="TC Släp 2" [ngModel]="trailer2IsTankContainer"
+        (ngModelChange)="trailer2IsTankContainerChange.emit($event)" />TC
+    </label>
+    <div *ngIf="trailer2IsTankContainer" class="container-field">
+      <label for="trailer2ContainerNumber">Containernummer (Släp 2):</label>
+      <input id="trailer2ContainerNumber" type="text" [ngModel]="trailer2ContainerNumber"
+        (ngModelChange)="trailer2ContainerNumberChange.emit($event)" placeholder="Containernummer" />
+    </div>
+  </div>
   <ng-container *ngTemplateOutlet="suggestions; context: { slot: 2 }"></ng-container>
   <div *ngIf="isNewTrailer2" class="badge warning">Nytt Släp 2</div>
 </div>

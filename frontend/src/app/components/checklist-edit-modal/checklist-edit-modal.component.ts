@@ -29,6 +29,7 @@ export class ChecklistEditModalComponent implements OnDestroy {
       // Djup kopia så att ändringar i formuläret inte muterar den
       // ursprungliga, redan genererade checklistans data förrän man sparar.
       this.model = structuredClone(value);
+      this.hasContainer = false;
       this.vehicleKey = this.currentVehicleKey();
       this.productToAdd = '';
       this.page = this.model.firstPage ?? {
@@ -61,6 +62,7 @@ export class ChecklistEditModalComponent implements OnDestroy {
   timestampLocal = '';
   private definitionSubscription?: Subscription;
   private vehicleKey = '';
+  private hasContainer = false;
 
   constructor(private readonly api: ApiService, private readonly tanks: TankCalculationService) {}
 
@@ -88,12 +90,13 @@ export class ChecklistEditModalComponent implements OnDestroy {
           const previous = page.rows.find(r => r.row === row.row);
           return {
             row: row.row,
-            tt: row.enabled[0] && (previous?.tt ?? (row.row >= 14 && row.row <= 19)),
-            tc: row.enabled[1] && (previous?.tc ?? false),
+            tt: row.enabled[0] && (previous?.tt ?? (!page.containerNumber.trim() && row.row >= 14 && row.row <= 19)),
+            tc: row.enabled[1] && (previous?.tc ?? (!!page.containerNumber.trim() && row.row >= 14 && row.row <= 19)),
             rc: row.enabled[2] && (previous?.rc ?? false),
             comment: previous?.comment ?? '',
           };
         });
+        this.changeContainerNumber(page.containerNumber);
         page.roles = definition.sections.map(section => {
           const previous = page.roles.find(r => r.row === section.row);
           return { row: section.row, selected: previous
@@ -108,6 +111,25 @@ export class ChecklistEditModalComponent implements OnDestroy {
         this.loading = false;
       },
     });
+  }
+
+  changeContainerNumber(value: string): void {
+    if (!this.page) return;
+    this.page.containerNumber = value;
+    const hasContainer = !!value.trim();
+    if (hasContainer !== this.hasContainer && this.definition) {
+      for (const row of this.page.rows) {
+        const enabled = this.definition.rows.find(r => r.row === row.row)?.enabled;
+        if (hasContainer && row.tt && enabled?.[1]) {
+          row.tt = false;
+          row.tc = true;
+        } else if (!hasContainer && row.tc && enabled?.[0]) {
+          row.tc = false;
+          row.tt = true;
+        }
+      }
+    }
+    this.hasContainer = hasContainer;
   }
 
   private defaultRoles(row: number, roles: string[]): string[] {
